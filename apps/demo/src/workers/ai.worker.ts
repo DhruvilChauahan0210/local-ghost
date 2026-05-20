@@ -4,9 +4,16 @@ import { pipeline, env } from '@huggingface/transformers';
 
 env.useBrowserCache = true;
 env.allowLocalModels = false;
-// Suppress ONNX Runtime node-assignment warnings (expected for quantized models)
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-(env as any).backends = { ...(env as any).backends, onnx: { wasm: { logLevel: 'error' } } };
+
+// ONNX Runtime emits [W:onnxruntime:] warnings directly from the WASM binary
+// via console.warn — they are expected for quantized models and cannot be
+// suppressed via env config. Filter them at the console level instead.
+const _warn = console.warn.bind(console);
+console.warn = (...args: unknown[]) => {
+  const msg = String(args[0] ?? '');
+  if (msg.includes('[W:onnxruntime:') || msg.includes('VerifyEachNodeIsAssignedToAnEp')) return;
+  _warn(...args);
+};
 
 type IncomingMessage =
   | { type: 'INIT' }
