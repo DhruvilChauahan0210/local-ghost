@@ -41,3 +41,7 @@ Thumbs.db
 
 # Package build output
 packages/*/dist/
+
+# Next.js
+apps/docs/.next/
+apps/docs/out/
