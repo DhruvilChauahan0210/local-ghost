@@ -130,10 +130,34 @@
   color: var(--ink) !important;
   border-radius: 0 !important;
   font-weight: 700 !important;
+  opacity: 1 !important;
 }
-.terminal-wrap [class*="bg-indigo-600"]:hover {
+/* Force ALL children (spans, SVGs, icons) to use dark ink on green */
+.terminal-wrap [class*="bg-indigo-600"] *,
+.terminal-wrap [class*="bg-indigo-600"] span,
+.terminal-wrap [class*="bg-indigo-600"] svg {
+  color: var(--ink) !important;
+  fill: var(--ink) !important;
+}
+.terminal-wrap [class*="bg-indigo-600"]:hover:not(:disabled) {
   background: #22ff55 !important;
   box-shadow: 0 0 16px var(--green-glow) !important;
+}
+/* Disabled state — clearly inactive, not a dimmed green blob */
+.terminal-wrap [class*="bg-indigo-600"]:disabled,
+.terminal-wrap [class*="bg-indigo-600"][disabled] {
+  background: var(--surface-2) !important;
+  color: var(--text-2) !important;
+  border: 1px solid var(--border-2) !important;
+  box-shadow: none !important;
+  cursor: not-allowed !important;
+  opacity: 1 !important;
+}
+/* Disabled children text also readable */
+.terminal-wrap [class*="bg-indigo-600"]:disabled *,
+.terminal-wrap [class*="bg-indigo-600"][disabled] * {
+  color: var(--text-2) !important;
+  fill: var(--text-2) !important;
 }
 /* Secondary buttons */
 .terminal-wrap [class*="bg-slate-700\/50"],
