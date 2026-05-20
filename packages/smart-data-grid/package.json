@@ -2,16 +2,32 @@
   "name": "local-ghost",
   "version": "0.1.0",
   "description": "Local Ghost — browser-native AI components for React. Natural language filtering, form auto-fill, and chart generation powered by WebGPU. Zero server. Zero API keys.",
-  "keywords": ["local-ghost", "webgpu", "ai", "react", "data-grid", "transformers", "llm", "browser-ai", "zero-server", "privacy", "on-device"],
+  "keywords": [
+    "local-ghost",
+    "webgpu",
+    "ai",
+    "react",
+    "data-grid",
+    "transformers",
+    "llm",
+    "browser-ai",
+    "zero-server",
+    "privacy",
+    "on-device"
+  ],
   "homepage": "https://github.com/DhruvilChauahan0210/local-ghost",
   "repository": {
     "type": "git",
-    "url": "https://github.com/DhruvilChauahan0210/local-ghost.git"
+    "url": "git+https://github.com/DhruvilChauahan0210/local-ghost.git"
   },
   "license": "MIT",
   "sideEffects": false,
-  "engines": { "node": ">=18.0.0" },
-  "publishConfig": { "access": "public" },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -23,7 +39,9 @@
       "types": "./dist/index.d.ts"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc && vite build",
     "dev": "vite build --watch"
