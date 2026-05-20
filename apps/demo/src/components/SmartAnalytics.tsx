@@ -17,7 +17,7 @@ interface ChartConfig {
   title: string;
 }
 
-type ChartStatus = 'idle' | 'running' | 'done' | 'error';
+type ChartStatus = 'idle' | 'running' | 'done' | 'filtered' | 'error';
 
 const COLORS = ['#818cf8','#34d399','#60a5fa','#f472b6','#fb923c','#a78bfa','#2dd4bf','#facc15'];
 
@@ -60,6 +60,49 @@ function aggregateData(
   });
 
   return { chartData, yKey };
+}
+
+// ─── Filter query detection & execution ──────────────────────────────────────
+function isFilterQuery(query: string): boolean {
+  return /\b(name|list|show|who|which|find|get|filter|employee|person|people)\b/i.test(query) &&
+    /\b(more than|greater than|less than|older than|younger than|above|below|over|under|with salary|earning|makes?)\b/i.test(query);
+}
+
+function applyFilter(query: string, columns: string[], data: Record<string, unknown>[]): Record<string, unknown>[] {
+  const q = query.toLowerCase();
+  let result = [...data];
+
+  // Numeric comparisons: "salary more than 10000", "age older than 30", etc.
+  const gtMatch = q.match(/(\w+)\s*(?:more than|greater than|above|over|older than|>\s*)(\d[\d,]*)/);
+  const ltMatch = q.match(/(\w+)\s*(?:less than|below|under|younger than|<\s*)(\d[\d,]*)/);
+
+  if (gtMatch) {
+    const field = columns.find(c => c.toLowerCase() === gtMatch[1])
+      ?? columns.find(c => q.includes(c.toLowerCase()) && typeof data[0]?.[c] === 'number');
+    const val = parseInt(gtMatch[2].replace(/,/g, ''));
+    if (field) result = result.filter(row => Number(row[field]) > val);
+  }
+  if (ltMatch) {
+    const field = columns.find(c => c.toLowerCase() === ltMatch[1])
+      ?? columns.find(c => q.includes(c.toLowerCase()) && typeof data[0]?.[c] === 'number');
+    const val = parseInt(ltMatch[2].replace(/,/g, ''));
+    if (field) result = result.filter(row => Number(row[field]) < val);
+  }
+
+  // String equality: "in New York", "role is Engineer"
+  const strMatch = q.match(/\b(?:in|from|role is|city is|is)\s+["']?([a-z][a-z\s]*)["']?/);
+  if (strMatch) {
+    const value = strMatch[1].trim();
+    const strCols = columns.filter(c => typeof data[0]?.[c] === 'string' && !/^(name|id)$/i.test(c));
+    for (const col of strCols) {
+      if (q.includes(col.toLowerCase()) || strCols.length === 1) {
+        result = result.filter(row => String(row[col]).toLowerCase().includes(value));
+        break;
+      }
+    }
+  }
+
+  return result;
 }
 
 // ─── Rule-based chart parser ──────────────────────────────────────────────────
@@ -199,6 +242,7 @@ export function SmartAnalytics({ data, className = '' }: SmartAnalyticsProps) {
   const [query, setQuery] = useState('');
   const [chartConfig, setChartConfig] = useState<ChartConfig | null>(null);
   const [chartData, setChartData] = useState<Record<string, unknown>[]>([]);
+  const [filteredData, setFilteredData] = useState<Record<string, unknown>[]>([]);
   const [chartStatus, setChartStatus] = useState<ChartStatus>('idle');
   const [chartError, setChartError] = useState<string | null>(null);
 
@@ -209,6 +253,14 @@ export function SmartAnalytics({ data, className = '' }: SmartAnalyticsProps) {
 
     setChartStatus('running');
     setChartError(null);
+
+    // 0. Detect filter queries before hitting LLM or chart parser
+    if (isFilterQuery(query)) {
+      const rows = applyFilter(query, columns, data);
+      setFilteredData(rows);
+      setChartStatus('filtered');
+      return;
+    }
 
     // 1. Try LLM if available
     if (ai.status === 'ready') {
@@ -251,6 +303,7 @@ export function SmartAnalytics({ data, className = '' }: SmartAnalyticsProps) {
   const handleReset = useCallback(() => {
     setChartConfig(null);
     setChartData([]);
+    setFilteredData([]);
     setChartStatus('idle');
     setChartError(null);
     setQuery('');
@@ -298,7 +351,7 @@ export function SmartAnalytics({ data, className = '' }: SmartAnalyticsProps) {
               <><svg className="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg><span>Working</span></>
             ) : <span>Generate</span>}
           </button>
-          {chartStatus === 'done' && (
+          {(chartStatus === 'done' || chartStatus === 'filtered') && (
             <button onClick={handleReset} className="flex items-center gap-1.5 rounded-lg border border-slate-600 bg-slate-700/50 px-4 py-2.5 text-sm font-medium text-slate-300 hover:bg-slate-700">Reset</button>
           )}
         </div>
@@ -326,11 +379,52 @@ export function SmartAnalytics({ data, className = '' }: SmartAnalyticsProps) {
         </div>
       )}
 
+      {/* Filter result — shows matching rows as a table */}
+      {chartStatus === 'filtered' && (
+        <div className="mt-4 rounded-xl border border-slate-700/60 bg-[#1a1d27] shadow-xl overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-700/60">
+            <div className="flex items-center gap-2">
+              <svg className="h-3.5 w-3.5 text-emerald-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd"/></svg>
+              <span className="text-xs font-semibold text-slate-300">Filter Result</span>
+              <span className="text-xs text-slate-500">— {filteredData.length} of {data.length} rows matched</span>
+            </div>
+          </div>
+          {filteredData.length === 0 ? (
+            <div className="px-4 py-8 text-center text-sm text-slate-500">No rows matched this filter.</div>
+          ) : (
+            <div className="overflow-x-auto max-h-72 overflow-y-auto table-sticky-header">
+              <table className="w-full min-w-full border-collapse text-xs">
+                <thead>
+                  <tr className="border-b border-slate-700/80 bg-[#1a1d27]">
+                    {columns.map(col => (
+                      <th key={col} className="whitespace-nowrap px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">{col}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredData.map((row, i) => (
+                    <tr key={i} className={i % 2 === 0 ? 'bg-transparent hover:bg-slate-800/40 transition-colors' : 'bg-slate-800/20 hover:bg-slate-800/50 transition-colors'}>
+                      {columns.map(col => (
+                        <td key={col} className="whitespace-nowrap px-4 py-2 text-slate-300">
+                          {typeof row[col] === 'number'
+                            ? <span className="font-mono text-sky-300 tabular-nums">{(row[col] as number).toLocaleString()}</span>
+                            : String(row[col] ?? '')}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
       {chartStatus === 'idle' && (
         <div className="mt-4 flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-700/40 bg-[#1a1d27]/50 p-8 text-center">
           <svg className="mb-3 h-10 w-10 text-slate-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/></svg>
-          <p className="text-sm text-slate-500">Describe a chart in plain English</p>
-          <p className="mt-1 text-xs text-slate-600">"average salary by role" · "count by city" · "salary pie by role"</p>
+          <p className="text-sm text-slate-500">Describe a chart or filter in plain English</p>
+          <p className="mt-1 text-xs text-slate-600">"average salary by role" · "employees with salary more than 100000" · "count by city"</p>
         </div>
       )}
 
