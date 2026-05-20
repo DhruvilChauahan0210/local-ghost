@@ -8,7 +8,8 @@ env.allowLocalModels = false;
 
 type IncomingMessage =
   | { type: 'INIT' }
-  | { type: 'RUN_QUERY'; schema: string; userInput: string };
+  | { type: 'RUN_QUERY'; schema: string; userInput: string }
+  | { type: 'EXTRACT_JSON'; schema: string; userInput: string };
 
 let generator: TextGenerationPipeline | null = null;
 
@@ -208,6 +209,71 @@ async function runQuery(schema: string, userInput: string): Promise<void> {
   }
 }
 
+const JSON_EXTRACT_SYSTEM_PROMPT = `You are a data extraction assistant. Extract information from the provided text and return ONLY a valid JSON object matching the given schema fields. No explanation, no markdown, just the JSON object.`;
+
+async function extractJSON(schema: string, userInput: string): Promise<void> {
+  if (!generator) {
+    self.postMessage({
+      type: 'ERROR',
+      message: 'Model not initialized. Please wait for initialization to complete.',
+    });
+    return;
+  }
+
+  const messages = [
+    { role: 'system', content: `${JSON_EXTRACT_SYSTEM_PROMPT}\n\nSchema fields (JSON): ${schema}` },
+    { role: 'user', content: userInput },
+  ];
+
+  try {
+    const output = await generator(messages, {
+      max_new_tokens: 512,
+      do_sample: false,
+      temperature: 0.1,
+    });
+
+    let raw = '';
+
+    if (Array.isArray(output) && output.length > 0) {
+      const first = output[0];
+      if (first && typeof first === 'object' && 'generated_text' in first) {
+        const generated = first.generated_text;
+        if (Array.isArray(generated) && generated.length > 0) {
+          const last = generated[generated.length - 1];
+          if (last && typeof last === 'object' && 'content' in last) {
+            raw = String(last.content);
+          }
+        } else if (typeof generated === 'string') {
+          raw = generated;
+        }
+      }
+    }
+
+    // Strip markdown fences if the model wraps in ```json ... ```
+    raw = raw
+      .replace(/```(?:json)?\n?/gi, '')
+      .replace(/```/g, '')
+      .trim();
+
+    // Extract the first {...} block
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      self.postMessage({ type: 'JSON_RESULT', data: {} });
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(jsonMatch[0]) as Record<string, string>;
+      self.postMessage({ type: 'JSON_RESULT', data: parsed });
+    } catch {
+      self.postMessage({ type: 'JSON_RESULT', data: {} });
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'JSON extraction failed';
+    self.postMessage({ type: 'ERROR', message });
+  }
+}
+
 self.onmessage = async (event: MessageEvent<IncomingMessage>) => {
   const msg = event.data;
 
@@ -218,6 +284,10 @@ self.onmessage = async (event: MessageEvent<IncomingMessage>) => {
 
     case 'RUN_QUERY':
       await runQuery(msg.schema, msg.userInput);
+      break;
+
+    case 'EXTRACT_JSON':
+      await extractJSON(msg.schema, msg.userInput);
       break;
   }
 };

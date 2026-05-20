@@ -1,4 +1,8 @@
+import { useState } from 'react';
 import { SmartDataGrid } from './components/SmartDataGrid';
+import { SmartForm } from './components/SmartForm';
+import { SmartAnalytics } from './components/SmartAnalytics';
+import type { SmartFormField } from './components/SmartForm';
 
 interface UserRecord {
   id: number;
@@ -32,7 +36,30 @@ const SAMPLE_USERS: UserRecord[] = [
   { id: 20, name: 'Tina Zhang', age: 30, city: 'Seattle', role: 'Analyst', salary: 104000 },
 ];
 
+const SMART_FORM_FIELDS: SmartFormField[] = [
+  { name: 'name', label: 'Full Name', type: 'text', placeholder: 'e.g. Alice Mercer' },
+  { name: 'email', label: 'Email Address', type: 'email', placeholder: 'e.g. alice@acme.com' },
+  { name: 'company', label: 'Company', type: 'text', placeholder: 'e.g. Acme Corp' },
+  { name: 'role', label: 'Role', type: 'select', options: ['Engineer', 'Designer', 'Manager', 'Analyst', 'Director', 'VP', 'Intern', 'Architect', 'Other'] },
+  { name: 'salary', label: 'Annual Salary (USD)', type: 'number', placeholder: 'e.g. 120000' },
+];
+
+const EXAMPLE_PASTE_TEXT = `Hi, I'm Sarah Johnson from TechCorp. I'm a Senior Software Engineer with 8 years of experience.
+You can reach me at sarah.johnson@techcorp.com. My current salary is $162,000 per year.
+I'm interested in the Engineering Manager role you posted.`;
+
+type Tab = 'grid' | 'form' | 'analytics';
+
+const TABS: { id: Tab; label: string; description: string }[] = [
+  { id: 'grid', label: 'Smart Grid', description: 'Natural language data queries' },
+  { id: 'form', label: 'Smart Form', description: 'AI-powered form auto-fill' },
+  { id: 'analytics', label: 'Smart Analytics', description: 'Natural language chart generation' },
+];
+
 export default function App() {
+  const [activeTab, setActiveTab] = useState<Tab>('grid');
+  const [submittedValues, setSubmittedValues] = useState<Record<string, string> | null>(null);
+
   return (
     <div className="min-h-screen bg-[#0f1117] px-4 py-10 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-6xl">
@@ -57,39 +84,110 @@ export default function App() {
             </div>
             <div>
               <h1 className="text-2xl font-bold tracking-tight text-white">
-                WebGPU AI Data Grid
+                WebGPU AI Component Library
               </h1>
               <p className="text-sm text-slate-400 mt-0.5">
-                Natural language queries — zero server round-trips
+                Phase 3 &mdash; SmartGrid, SmartForm &amp; SmartAnalytics &mdash; zero server round-trips
               </p>
             </div>
           </div>
-
-          <div className="flex flex-wrap gap-2 mt-4">
-            {[
-              'show only users older than 30, sorted by name',
-              'filter engineers earning over 130000',
-              'show top 5 highest salaries',
-              'users in San Francisco or New York',
-            ].map((example) => (
-              <span
-                key={example}
-                className="inline-flex items-center rounded-full bg-slate-800 border border-slate-700 px-3 py-1 text-xs text-slate-400"
-              >
-                &ldquo;{example}&rdquo;
-              </span>
-            ))}
-          </div>
         </header>
 
-        {/* Grid */}
-        <SmartDataGrid data={SAMPLE_USERS as unknown as Record<string, unknown>[]} />
+        {/* Tab Navigation */}
+        <nav className="mb-6 flex gap-1 rounded-xl border border-slate-700/60 bg-[#1a1d27] p-1" aria-label="Component tabs">
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={[
+                'flex-1 rounded-lg px-4 py-2.5 text-sm font-medium transition-all',
+                activeTab === tab.id
+                  ? 'bg-indigo-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50',
+              ].join(' ')}
+              aria-current={activeTab === tab.id ? 'page' : undefined}
+            >
+              <span className="block">{tab.label}</span>
+              <span className={['block text-xs mt-0.5 font-normal', activeTab === tab.id ? 'text-indigo-200' : 'text-slate-600'].join(' ')}>
+                {tab.description}
+              </span>
+            </button>
+          ))}
+        </nav>
+
+        {/* Tab Content */}
+        {activeTab === 'grid' && (
+          <section aria-label="Smart Data Grid">
+            <div className="mb-4 flex flex-wrap gap-2">
+              {[
+                'show only users older than 30, sorted by name',
+                'filter engineers earning over 130000',
+                'show top 5 highest salaries',
+                'users in San Francisco or New York',
+              ].map((example) => (
+                <span
+                  key={example}
+                  className="inline-flex items-center rounded-full bg-slate-800 border border-slate-700 px-3 py-1 text-xs text-slate-400"
+                >
+                  &ldquo;{example}&rdquo;
+                </span>
+              ))}
+            </div>
+            <SmartDataGrid data={SAMPLE_USERS as unknown as Record<string, unknown>[]} />
+          </section>
+        )}
+
+        {activeTab === 'form' && (
+          <section aria-label="Smart Form">
+            <div className="mb-4 rounded-lg border border-slate-700/40 bg-slate-800/30 px-4 py-3">
+              <p className="text-xs font-medium text-slate-400 mb-1">Example text to paste:</p>
+              <p className="text-xs text-slate-500 leading-relaxed font-mono">{EXAMPLE_PASTE_TEXT}</p>
+            </div>
+            <SmartForm
+              fields={SMART_FORM_FIELDS}
+              onSubmit={(values) => setSubmittedValues(values)}
+            />
+            {submittedValues && (
+              <div className="mt-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+                <div className="mb-2 flex items-center gap-2">
+                  <svg className="h-4 w-4 text-emerald-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
+                  </svg>
+                  <span className="text-sm font-semibold text-emerald-300">Form Submitted</span>
+                </div>
+                <pre className="text-xs text-emerald-200/70 overflow-auto">
+                  {JSON.stringify(submittedValues, null, 2)}
+                </pre>
+              </div>
+            )}
+          </section>
+        )}
+
+        {activeTab === 'analytics' && (
+          <section aria-label="Smart Analytics">
+            <div className="mb-4 flex flex-wrap gap-2">
+              {[
+                'show salary distribution by role',
+                'average age per city',
+                'count employees by role',
+              ].map((example) => (
+                <span
+                  key={example}
+                  className="inline-flex items-center rounded-full bg-slate-800 border border-slate-700 px-3 py-1 text-xs text-slate-400"
+                >
+                  &ldquo;{example}&rdquo;
+                </span>
+              ))}
+            </div>
+            <SmartAnalytics data={SAMPLE_USERS as unknown as Record<string, unknown>[]} />
+          </section>
+        )}
 
         {/* Footer */}
         <footer className="mt-8 text-center text-xs text-slate-600">
-          Phase 1 &mdash; Powered by{' '}
+          Phase 3 &mdash; Powered by{' '}
           <span className="text-slate-500">@huggingface/transformers v3</span>{' '}
-          &middot; Model runs entirely in your browser
+          &middot; Model runs entirely in your browser &middot; WebGPU &rarr; WASM &rarr; Server fallback
         </footer>
       </div>
     </div>

@@ -19,7 +19,8 @@
   },
   "peerDependencies": {
     "react": "^18.0.0",
-    "react-dom": "^18.0.0"
+    "react-dom": "^18.0.0",
+    "recharts": "^2.0.0"
   },
   "dependencies": {
     "@huggingface/transformers": "^3.0.0"
