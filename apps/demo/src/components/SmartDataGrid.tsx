@@ -113,6 +113,7 @@ export function SmartDataGrid({ data }: SmartDataGridProps) {
   const [displayData, setDisplayData] = useState<Record<string, unknown>[]>(data);
   const [queryStatus, setQueryStatus] = useState<QueryStatus>('idle');
   const [queryError, setQueryError] = useState<string | null>(null);
+  const [usedFallback, setUsedFallback] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const columns = data.length > 0 ? Object.keys(data[0]) : [];
@@ -126,9 +127,9 @@ export function SmartDataGrid({ data }: SmartDataGridProps) {
     const schema = columns.join(', ');
 
     try {
-      const code = await ai.runQuery(schema, query.trim());
+      const { code, usedFallback: fb } = await ai.runQuery(schema, query.trim());
+      setUsedFallback(fb);
 
-      // Isolated sandbox: new Function scope, no access to globals
       const sandbox = new Function('data', `return (${code})(data)`);
       const result = sandbox(data) as unknown;
 
@@ -150,6 +151,7 @@ export function SmartDataGrid({ data }: SmartDataGridProps) {
     setQuery('');
     setQueryStatus('idle');
     setQueryError(null);
+    setUsedFallback(false);
     inputRef.current?.focus();
   }, [data]);
 
@@ -368,6 +370,11 @@ export function SmartDataGrid({ data }: SmartDataGridProps) {
           {isFiltered && (
             <span className="inline-flex items-center rounded-full bg-indigo-500/15 px-2 py-0.5 text-xs font-medium text-indigo-300 border border-indigo-500/20">
               Filtered
+            </span>
+          )}
+          {usedFallback && (
+            <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-400 border border-amber-500/20" title="AI produced invalid code — basic pattern matching used as repair">
+              Basic repair
             </span>
           )}
         </div>

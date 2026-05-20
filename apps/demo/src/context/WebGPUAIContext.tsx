@@ -1,11 +1,5 @@
 import {
-  createContext,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-  useCallback,
-  type ReactNode,
+  createContext, useContext, useEffect, useRef, useState, useCallback, type ReactNode,
 } from 'react';
 
 export interface AIState {
@@ -15,28 +9,37 @@ export interface AIState {
   mode: 'webgpu' | 'wasm' | 'server' | null;
 }
 
-interface QueryResolver {
-  resolve: (code: string) => void;
-  reject: (reason: string) => void;
+export interface AnalysisResult {
+  action: 'chart' | 'filter';
+  // chart fields
+  type?: 'bar' | 'line' | 'pie';
+  xKey?: string;
+  yKey?: string;
+  aggregation?: 'count' | 'avg' | 'sum' | 'max' | 'min';
+  // filter fields
+  field?: string;
+  op?: '>' | '<' | '=' | 'contains';
+  value?: string | number;
+  // shared
+  title?: string;
 }
 
-interface JSONResolver {
-  resolve: (data: Record<string, string>) => void;
-  reject: (reason: string) => void;
-}
+interface Resolver<T> { resolve: (v: T) => void; reject: (r: string) => void; }
 
 interface WebGPUAIContextValue extends AIState {
   initAI: () => void;
-  runQuery: (schema: string, userInput: string) => Promise<string>;
+  runQuery:    (schema: string, userInput: string) => Promise<{ code: string; usedFallback: boolean }>;
   extractJSON: (schema: string, userInput: string) => Promise<Record<string, string>>;
+  analyzeData: (schema: string, userInput: string) => Promise<AnalysisResult>;
 }
 
 type WorkerMessage =
-  | { type: 'PROGRESS'; progress: number }
+  | { type: 'PROGRESS';        progress: number }
   | { type: 'READY' }
-  | { type: 'QUERY_RESULT'; code: string }
-  | { type: 'JSON_RESULT'; data: Record<string, string> }
-  | { type: 'ERROR'; message: string };
+  | { type: 'QUERY_RESULT';    code: string; usedFallback: boolean }
+  | { type: 'JSON_RESULT';     data: Record<string, string> }
+  | { type: 'ANALYSIS_RESULT'; result: AnalysisResult }
+  | { type: 'ERROR';           message: string };
 
 export interface WebGPUAIProviderProps {
   children: ReactNode;
@@ -46,202 +49,102 @@ export interface WebGPUAIProviderProps {
 const WebGPUAIContext = createContext<WebGPUAIContextValue | null>(null);
 
 export function WebGPUAIProvider({ children, serverFallbackUrl }: WebGPUAIProviderProps) {
-  const [aiState, setAiState] = useState<AIState>({
-    status: 'uninitialized',
-    progress: 0,
-    error: null,
-    mode: null,
-  });
+  const [aiState, setAiState] = useState<AIState>({ status: 'uninitialized', progress: 0, error: null, mode: null });
 
-  const workerRef = useRef<Worker | null>(null);
-  const pendingQueryRef = useRef<QueryResolver | null>(null);
-  const pendingJSONRef = useRef<JSONResolver | null>(null);
-  const serverFallbackUrlRef = useRef<string | undefined>(serverFallbackUrl);
-  serverFallbackUrlRef.current = serverFallbackUrl;
+  const workerRef       = useRef<Worker | null>(null);
+  const queryRef        = useRef<Resolver<{ code: string; usedFallback: boolean }> | null>(null);
+  const jsonRef         = useRef<Resolver<Record<string, string>> | null>(null);
+  const analysisRef     = useRef<Resolver<AnalysisResult> | null>(null);
+  const fallbackUrlRef  = useRef(serverFallbackUrl);
+  fallbackUrlRef.current = serverFallbackUrl;
+
+  const rejectAll = (msg: string) => {
+    queryRef.current?.reject(msg);    queryRef.current = null;
+    jsonRef.current?.reject(msg);     jsonRef.current = null;
+    analysisRef.current?.reject(msg); analysisRef.current = null;
+  };
 
   const initAI = useCallback(() => {
     if (aiState.status !== 'uninitialized') return;
 
     const hasWebGPU = typeof navigator !== 'undefined' && 'gpu' in navigator;
-
-    const worker = new Worker(
-      new URL('../workers/ai.worker.ts', import.meta.url),
-      { type: 'module' }
-    );
-
+    const worker = new Worker(new URL('../workers/ai.worker.ts', import.meta.url), { type: 'module' });
     workerRef.current = worker;
 
     worker.onmessage = (event: MessageEvent<WorkerMessage>) => {
       const msg = event.data;
-
       switch (msg.type) {
         case 'PROGRESS':
-          setAiState((prev) => ({
-            ...prev,
-            status: 'loading',
-            progress: msg.progress,
-          }));
+          setAiState(p => ({ ...p, status: 'loading', progress: msg.progress }));
           break;
-
         case 'READY':
-          setAiState((prev) => ({
-            ...prev,
-            status: 'ready',
-            progress: 100,
-            error: null,
-            mode: hasWebGPU ? 'webgpu' : 'wasm',
-          }));
+          setAiState(p => ({ ...p, status: 'ready', progress: 100, error: null, mode: hasWebGPU ? 'webgpu' : 'wasm' }));
           break;
-
         case 'QUERY_RESULT':
-          if (pendingQueryRef.current) {
-            pendingQueryRef.current.resolve(msg.code);
-            pendingQueryRef.current = null;
-          }
+          queryRef.current?.resolve({ code: msg.code, usedFallback: msg.usedFallback });
+          queryRef.current = null;
           break;
-
         case 'JSON_RESULT':
-          if (pendingJSONRef.current) {
-            pendingJSONRef.current.resolve(msg.data);
-            pendingJSONRef.current = null;
-          }
+          jsonRef.current?.resolve(msg.data);
+          jsonRef.current = null;
           break;
-
-        case 'ERROR': {
-          const fallbackUrl = serverFallbackUrlRef.current;
-          if (fallbackUrl) {
-            setAiState({
-              status: 'ready',
-              progress: 100,
-              error: null,
-              mode: 'server',
-            });
-            if (pendingQueryRef.current) {
-              pendingQueryRef.current.reject(msg.message);
-              pendingQueryRef.current = null;
-            }
-            if (pendingJSONRef.current) {
-              pendingJSONRef.current.reject(msg.message);
-              pendingJSONRef.current = null;
-            }
+        case 'ANALYSIS_RESULT':
+          analysisRef.current?.resolve(msg.result);
+          analysisRef.current = null;
+          break;
+        case 'ERROR':
+          if (fallbackUrlRef.current) {
+            setAiState(p => ({ ...p, status: 'ready', progress: 100, error: null, mode: 'server' }));
           } else {
-            setAiState((prev) => ({
-              ...prev,
-              status: 'error',
-              error: msg.message,
-            }));
-            if (pendingQueryRef.current) {
-              pendingQueryRef.current.reject(msg.message);
-              pendingQueryRef.current = null;
-            }
-            if (pendingJSONRef.current) {
-              pendingJSONRef.current.reject(msg.message);
-              pendingJSONRef.current = null;
-            }
+            setAiState(p => ({ ...p, status: 'error', error: msg.message }));
           }
+          rejectAll(msg.message);
           break;
-        }
       }
     };
 
     worker.onerror = (err) => {
-      const message = err.message ?? 'Unknown worker error';
-      const fallbackUrl = serverFallbackUrlRef.current;
-      if (fallbackUrl) {
-        setAiState({ status: 'ready', progress: 100, error: null, mode: 'server' });
+      const message = err.message ?? 'Worker error';
+      if (fallbackUrlRef.current) {
+        setAiState(p => ({ ...p, status: 'ready', progress: 100, error: null, mode: 'server' }));
       } else {
         setAiState({ status: 'error', progress: 0, error: message, mode: null });
       }
-      if (pendingQueryRef.current) {
-        pendingQueryRef.current.reject(message);
-        pendingQueryRef.current = null;
-      }
-      if (pendingJSONRef.current) {
-        pendingJSONRef.current.reject(message);
-        pendingJSONRef.current = null;
-      }
+      rejectAll(message);
     };
 
     setAiState({ status: 'loading', progress: 0, error: null, mode: null });
     worker.postMessage({ type: 'INIT' });
   }, [aiState.status]);
 
-  useEffect(() => {
-    return () => {
-      workerRef.current?.terminate();
-      workerRef.current = null;
-    };
-  }, []);
+  useEffect(() => () => { workerRef.current?.terminate(); workerRef.current = null; }, []);
 
-  const runQuery = useCallback(
-    (schema: string, userInput: string): Promise<string> => {
-      if (aiState.mode === 'server') {
-        const url = serverFallbackUrlRef.current;
-        if (!url) return Promise.reject('No server fallback URL configured');
-        return fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'RUN_QUERY', schema, userInput }),
-        })
-          .then((r) => r.json() as Promise<{ code: string }>)
-          .then((j) => j.code);
-      }
+  const runQuery = useCallback((schema: string, userInput: string) =>
+    new Promise<{ code: string; usedFallback: boolean }>((resolve, reject) => {
+      if (!workerRef.current) { reject('AI not initialized'); return; }
+      if (queryRef.current)   { reject('Query already in progress'); return; }
+      queryRef.current = { resolve, reject };
+      workerRef.current.postMessage({ type: 'RUN_QUERY', schema, userInput });
+    }), []);
 
-      return new Promise<string>((resolve, reject) => {
-        if (!workerRef.current) {
-          reject('Worker is not initialized');
-          return;
-        }
-        if (pendingQueryRef.current) {
-          reject('A query is already in progress');
-          return;
-        }
-        pendingQueryRef.current = { resolve, reject };
-        workerRef.current.postMessage({ type: 'RUN_QUERY', schema, userInput });
-      });
-    },
-    [aiState.mode]
-  );
+  const extractJSON = useCallback((schema: string, userInput: string) =>
+    new Promise<Record<string, string>>((resolve, reject) => {
+      if (!workerRef.current) { reject('AI not initialized'); return; }
+      if (jsonRef.current)    { reject('Extraction already in progress'); return; }
+      jsonRef.current = { resolve, reject };
+      workerRef.current.postMessage({ type: 'EXTRACT_JSON', schema, userInput });
+    }), []);
 
-  const extractJSON = useCallback(
-    (schema: string, userInput: string): Promise<Record<string, string>> => {
-      if (aiState.mode === 'server') {
-        const url = serverFallbackUrlRef.current;
-        if (!url) return Promise.reject('No server fallback URL configured');
-        return fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'EXTRACT_JSON', schema, userInput }),
-        })
-          .then((r) => r.json() as Promise<{ data: Record<string, string> }>)
-          .then((j) => j.data);
-      }
-
-      return new Promise<Record<string, string>>((resolve, reject) => {
-        if (!workerRef.current) {
-          reject('Worker is not initialized');
-          return;
-        }
-        if (pendingJSONRef.current) {
-          reject('A JSON extraction is already in progress');
-          return;
-        }
-        pendingJSONRef.current = { resolve, reject };
-        workerRef.current.postMessage({ type: 'EXTRACT_JSON', schema, userInput });
-      });
-    },
-    [aiState.mode]
-  );
-
-  const contextValue: WebGPUAIContextValue = {
-    ...aiState,
-    initAI,
-    runQuery,
-    extractJSON,
-  };
+  const analyzeData = useCallback((schema: string, userInput: string) =>
+    new Promise<AnalysisResult>((resolve, reject) => {
+      if (!workerRef.current)    { reject('AI not initialized'); return; }
+      if (analysisRef.current)   { reject('Analysis already in progress'); return; }
+      analysisRef.current = { resolve, reject };
+      workerRef.current.postMessage({ type: 'ANALYZE_DATA', schema, userInput });
+    }), []);
 
   return (
-    <WebGPUAIContext.Provider value={contextValue}>
+    <WebGPUAIContext.Provider value={{ ...aiState, initAI, runQuery, extractJSON, analyzeData }}>
       {children}
     </WebGPUAIContext.Provider>
   );
@@ -249,8 +152,6 @@ export function WebGPUAIProvider({ children, serverFallbackUrl }: WebGPUAIProvid
 
 export function useWebGPUAIContext(): WebGPUAIContextValue {
   const ctx = useContext(WebGPUAIContext);
-  if (!ctx) {
-    throw new Error('useWebGPUAIContext must be used within a WebGPUAIProvider');
-  }
+  if (!ctx) throw new Error('useWebGPUAIContext must be used within a WebGPUAIProvider');
   return ctx;
 }

@@ -19,77 +19,7 @@ export interface SmartFormProps {
 
 type ExtractStatus = 'idle' | 'running' | 'done' | 'error';
 
-// ─── Rule-based extractor ────────────────────────────────────────────────────
-// Runs when the LLM produces invalid/empty JSON. Handles real arbitrary text.
-function ruleBasedExtract(text: string, fields: SmartFormField[]): Record<string, string> {
-  const result: Record<string, string> = {};
-
-  for (const field of fields) {
-    const lbl = field.label.toLowerCase();
-
-    if (field.type === 'email') {
-      const m = text.match(/[\w.+\-]+@[\w\-]+\.[a-z]{2,}/i);
-      if (m) result[field.name] = m[0];
-      continue;
-    }
-
-    if (field.type === 'select' && field.options) {
-      for (const opt of field.options) {
-        if (new RegExp(`\\b${opt}\\b`, 'i').test(text)) {
-          result[field.name] = opt;
-          break;
-        }
-      }
-      continue;
-    }
-
-    if (field.type === 'number') {
-      if (/salary|pay|compensation|income|wage|rate/i.test(lbl)) {
-        // Match "$162,000", "162000", "162k", "$162k"
-        const m = text.match(/\$?([\d,]+)\s*k?\b/gi);
-        if (m) {
-          for (const raw of m) {
-            const digits = parseInt(raw.replace(/[$,]/g, ''));
-            if (digits > 10000) { result[field.name] = String(digits); break; }
-            if (/k/i.test(raw) && digits > 0) { result[field.name] = String(digits * 1000); break; }
-          }
-        }
-      }
-      continue;
-    }
-
-    if (field.type === 'text') {
-      if (/\bname\b/i.test(lbl)) {
-        // "I'm Sarah Johnson", "My name is ...", "Hi, I'm ..."
-        const m = text.match(
-          /(?:I['']m|I am|my name is|Hi[,!]?\s+I['']m)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,2})/
-        );
-        if (m) result[field.name] = m[1];
-        continue;
-      }
-
-      if (/company|org|employer|workplace/i.test(lbl)) {
-        // "from TechCorp", "at Acme Corp", "@ Google"
-        const m = text.match(
-          /(?:\bfrom\b|\bat\b|\bwith\b|@)\s+([A-Z][A-Za-z0-9\s&.]+?)(?:\.|,|$|\n)/m
-        );
-        if (m) result[field.name] = m[1].trim();
-        continue;
-      }
-
-      if (/role|title|position|job/i.test(lbl)) {
-        // "Senior Software Engineer", "Engineering Manager", etc.
-        const m = text.match(
-          /(?:Senior|Junior|Lead|Principal|Staff|Chief|Head of|VP of|Director of)?\s*[A-Z][a-z]+\s+(?:Engineer|Manager|Designer|Analyst|Developer|Architect|Director|Officer|Specialist)/
-        );
-        if (m) result[field.name] = m[0].trim();
-        continue;
-      }
-    }
-  }
-
-  return result;
-}
+// No rule-based extraction — AI decides everything or it fails honestly.
 
 // ─── Status badge ────────────────────────────────────────────────────────────
 function AIStatusBadge({ status, progress, error, mode }: {
@@ -143,36 +73,25 @@ export function SmartForm({ fields, onSubmit, className = '' }: SmartFormProps) 
   }, [fields]);
 
   const handleAutoFill = useCallback(async () => {
-    if (!pastedText.trim()) return;
+    if (!pastedText.trim() || ai.status !== 'ready') return;
 
     setExtractStatus('running');
     setExtractError(null);
 
-    // 1. Try LLM if available
-    if (ai.status === 'ready') {
-      try {
-        const schema = JSON.stringify(fields.map(f => ({ name: f.name, label: f.label, type: f.type })));
-        const userInput = `Extract the following fields from the text below. Return only a JSON object with keys matching the field names.\n\nText: """${pastedText}"""`;
-        const extracted = await ai.extractJSON(schema, userInput);
-        const hasValues = Object.values(extracted).some(v => v !== '' && v !== null && v !== undefined);
-        if (hasValues) {
-          applyExtracted(extracted);
-          setExtractStatus('done');
-          return;
-        }
-      } catch {
-        // LLM failed — fall through to rule-based
+    try {
+      const schema = JSON.stringify(fields.map(f => ({ name: f.name, label: f.label, type: f.type })));
+      const userInput = `Extract the following fields from the text below. Return only a JSON object with keys matching the field names.\n\nText: """${pastedText}"""`;
+      const extracted = await ai.extractJSON(schema, userInput);
+      const hasValues = Object.values(extracted).some(v => v !== '' && v !== null && v !== undefined);
+      if (hasValues) {
+        applyExtracted(extracted);
+        setExtractStatus('done');
+      } else {
+        setExtractError('AI could not find matching fields in this text. Try pasting something that clearly mentions a name, email, company, role, or salary.');
+        setExtractStatus('error');
       }
-    }
-
-    // 2. Rule-based fallback — always works on real text
-    const extracted = ruleBasedExtract(pastedText, fields);
-    const hasValues = Object.values(extracted).some(v => v !== '');
-    if (hasValues) {
-      applyExtracted(extracted);
-      setExtractStatus('done');
-    } else {
-      setExtractError('Could not extract fields from this text. Try pasting text that mentions a name, email, company, role, or salary.');
+    } catch (err) {
+      setExtractError(err instanceof Error ? err.message : 'AI extraction failed. Try rephrasing the text.');
       setExtractStatus('error');
     }
   }, [ai, fields, pastedText, applyExtracted]);

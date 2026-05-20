@@ -1,10 +1,13 @@
 import { useWebGPUAIContext } from '../context/WebGPUAIContext';
-import type { AIState } from '../context/WebGPUAIContext';
+import type { AIState, AnalysisResult } from '../context/WebGPUAIContext';
+
+export type { AnalysisResult };
 
 export interface UseWebGPUAIReturn extends AIState {
-  initAI: () => void;
-  runQuery: (schema: string, userInput: string) => Promise<string>;
+  initAI:      () => void;
+  runQuery:    (schema: string, userInput: string) => Promise<{ code: string; usedFallback: boolean }>;
   extractJSON: (schema: string, userInput: string) => Promise<Record<string, string>>;
+  analyzeData: (schema: string, userInput: string) => Promise<AnalysisResult>;
 }
 
 export function useWebGPUAI(): UseWebGPUAIReturn {
