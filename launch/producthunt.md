@@ -1,12 +1,12 @@
 # Product Hunt Listing
 
-**Name**: WebGPU-UI / SmartDataGrid
+**Name**: WebGPU-UI / Local Ghost
 
 **Tagline**: AI-powered React components with zero server infrastructure
 
 **Description**:
 
-SmartDataGrid is an open-source React component library that brings natural language AI directly into your UI — with no backend, no API keys, and no data leaving the browser. Drop in `<SmartDataGrid>`, `<SmartForm>`, or `<SmartAnalytics>`, wrap with `<WebGPUAIProvider>`, and your users can query tables, auto-fill forms, and generate charts in plain English — all on their own GPU.
+Local Ghost is an open-source React component library that brings natural language AI directly into your UI — with no backend, no API keys, and no data leaving the browser. Drop in `<SmartDataGrid>`, `<SmartForm>`, or `<SmartAnalytics>`, wrap with `<WebGPUAIProvider>`, and your users can query tables, auto-fill forms, and generate charts in plain English — all on their own GPU.
 
 What makes it different: every other AI UI component on Product Hunt requires a server to proxy LLM calls. That means infrastructure cost, API key management, GDPR surface area, and latency. WebGPU-UI eliminates all of that. A quantized 0.5B-parameter model runs entirely inside a Web Worker via the WebGPU API, with automatic WASM fallback for Firefox. Model weights download once and persist in CacheStorage — $0/month, forever, for every user.
 

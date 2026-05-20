@@ -1,9 +1,9 @@
-# SmartDataGrid — Browser-Native AI Components
+# Local Ghost — Browser-Native AI Components
 
 > Natural language data filtering, form auto-fill, and chart generation.  
 > Zero server. Zero API keys. Runs entirely on your GPU.
 
-[![npm version](https://img.shields.io/npm/v/@webgpu-ui/smart-data-grid)](https://www.npmjs.com/package/@webgpu-ui/smart-data-grid)
+[![npm version](https://img.shields.io/npm/v/local-ghost)](https://www.npmjs.com/package/local-ghost)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![WebGPU](https://img.shields.io/badge/WebGPU-enabled-orange)](https://developer.mozilla.org/en-US/docs/Web/API/WebGPU_API)
 
@@ -18,7 +18,7 @@ Every AI-powered UI component today requires:
 
 ## The Solution
 
-SmartDataGrid runs a quantized LLM **directly in the browser** via WebGPU. No server. No API key. No data leaves the device.
+**Local Ghost** runs a quantized LLM directly in the browser via WebGPU. No server. No API key. No data leaves the device.
 
 ```
 User types query → WebGPU LLM → Filtered results
@@ -56,7 +56,7 @@ Natural language to Recharts visualizations.
 ## Installation
 
 ```bash
-npm install @webgpu-ui/smart-data-grid
+npm install local-ghost
 ```
 
 Peer dependencies: `react ^18`, `recharts ^2`
@@ -66,7 +66,7 @@ Peer dependencies: `react ^18`, `recharts ^2`
 ## Quick Start
 
 ```tsx
-import { WebGPUAIProvider, SmartDataGrid } from '@webgpu-ui/smart-data-grid';
+import { WebGPUAIProvider, SmartDataGrid } from 'local-ghost';
 
 export default function App() {
   return (
@@ -84,16 +84,16 @@ export default function App() {
 ```
 Browser Tab
 ├── WebGPUAIProvider  ← initializes model pipeline
-│   └── Web Worker   ← inference runs off main thread
+│   └── Web Worker   ← inference runs off main thread (no UI jank)
 │       └── WebGPU   ← GPU acceleration (falls back to WASM)
 └── Components
-    ├── SmartDataGrid  ← generates JS filter/sort code
-    ├── SmartForm      ← extracts JSON from text
-    └── SmartAnalytics ← decides chart vs filter, returns config
+    ├── SmartDataGrid  ← AI generates JS filter/sort code
+    ├── SmartForm      ← AI extracts JSON from unstructured text
+    └── SmartAnalytics ← AI decides chart vs filter + parameters
 ```
 
 **Model**: `onnx-community/Qwen2.5-Coder-0.5B-Instruct` (~300MB, cached after first load)  
-**Fallback**: WebGPU → WASM → optional server API
+**Fallback chain**: WebGPU → WASM → optional server API
 
 ---
 
@@ -112,7 +112,7 @@ Browser Tab
 
 ```
 /
-├── packages/smart-data-grid/   ← npm package
+├── packages/smart-data-grid/   ← npm package (local-ghost)
 ├── apps/demo/                  ← live demo (Vite)
 └── apps/docs/                  ← documentation (Next.js)
 ```
@@ -121,4 +121,4 @@ Browser Tab
 
 ## License
 
-MIT © 2026
+MIT © 2026 — Local Ghost

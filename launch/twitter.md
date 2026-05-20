@@ -72,7 +72,7 @@ Chrome 113+, Edge 113+, Safari 18+ get GPU acceleration. Firefox gets WASM fallb
 It's open source and on npm today.
 
 ```bash
-npm install @webgpu-ui/smart-data-grid
+npm install @local-ghost
 ```
 
 GitHub: https://github.com/DhruvilChauahan0210/local-ghost

@@ -13,4 +13,4 @@ I built three components on top of this infrastructure: `<SmartDataGrid>` takes 
 The repo is a Turborepo monorepo: the npm package lives in `packages/smart-data-grid`, a Vite demo app is at `apps/demo`, and a Next.js docs site is at `apps/docs`. The live demo is at `http://localhost:5173` if you clone and run it. I'd love feedback on the structured prompting approach for code generation — right now the LLM outputs raw JS and I sandbox-eval it, which works well but there's definitely room to make the prompts more robust. Also curious whether anyone has ideas on reducing the 300MB first-load weight (I've looked at smaller models but quality drops off sharply below 0.5B for code generation tasks).
 
 GitHub: https://github.com/DhruvilChauahan0210/local-ghost  
-npm: `npm install @webgpu-ui/smart-data-grid`
+npm: `npm install @local-ghost`

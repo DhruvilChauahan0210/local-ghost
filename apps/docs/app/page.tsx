@@ -68,7 +68,7 @@ export default function HomePage() {
 
       <nav className="nav">
         <span className="nav-logo">
-          SMARTDATAGRID<span className="cursor blink">_</span>
+          LOCAL GHOST<span className="cursor blink">_</span>
         </span>
         <div className="nav-links">
           <a href="https://github.com" className="nav-link">[ GitHub ]</a>
@@ -99,7 +99,7 @@ export default function HomePage() {
               <span className="terminal-dot red" />
               <span className="terminal-dot yellow" />
               <span className="terminal-dot green" />
-              <span className="terminal-title">smartgrid — query engine v0.1.0</span>
+              <span className="terminal-title">local-ghost — v0.1.0</span>
             </div>
             <div className="terminal-body">
               <div className="terminal-line">
@@ -192,7 +192,7 @@ export default function HomePage() {
               <code>
                 <span className="c-muted">$</span>
                 {' npm install '}
-                <span className="c-green">@webgpu-ui/smart-data-grid</span>
+                <span className="c-green">local-ghost</span>
                 {'\n'}
                 <span className="c-muted">#</span>
                 {' peer deps: react ^18, recharts ^2'}
@@ -209,7 +209,7 @@ export default function HomePage() {
                 {'\n         '}
                 <span className="c-orange">{'SmartForm, SmartAnalytics }'}</span>
                 {'\n  from '}
-                <span className="c-green">&apos;@webgpu-ui/smart-data-grid&apos;</span>
+                <span className="c-green">&apos;local-ghost&apos;</span>
                 {';\n\nexport default function '}
                 <span className="c-yellow">App</span>
                 {'() {\n  return (\n    '}
@@ -236,7 +236,7 @@ export default function HomePage() {
 
         <footer>
           <div className="footer-inner">
-            <span className="footer-logo">SMARTDATAGRID_</span>
+            <span className="footer-logo">LOCAL GHOST_</span>
             <span>
               Built with{' '}
               <span className="c-green">@huggingface/transformers</span>

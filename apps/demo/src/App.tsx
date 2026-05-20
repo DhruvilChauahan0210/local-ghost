@@ -94,7 +94,7 @@ export default function App() {
             color: 'var(--green)',
             textShadow: '0 0 12px rgba(0,255,65,0.4)',
           }}>
-            SMARTDATAGRID
+            LOCAL GHOST
           </span>
           <span style={{ fontSize: '0.6rem', color: 'var(--text-3)', letterSpacing: '0.12em', textTransform: 'uppercase', borderLeft: '1px solid var(--border)', paddingLeft: '0.75rem' }}>
             Live Demo
@@ -134,11 +134,11 @@ export default function App() {
             lineHeight: 0.9, letterSpacing: '0.02em',
             color: 'var(--text)', marginBottom: '1rem',
           }}>
-            BROWSER<br />
+            LOCAL<br />
             <span style={{
               color: 'var(--green)',
               textShadow: '0 0 30px rgba(0,255,65,0.25)',
-            }}>NATIVE AI.</span>
+            }}>GHOST.</span>
           </h1>
           <p style={{ fontSize: '0.8rem', color: 'var(--text-2)', lineHeight: 1.9, maxWidth: '480px' }}>
             Three components. Zero servers. Runs entirely on your GPU.<br />
@@ -291,7 +291,7 @@ export default function App() {
         fontSize: '0.65rem', color: 'var(--text-3)', letterSpacing: '0.06em',
       }}>
         <span style={{ fontFamily: 'var(--font-display)', fontSize: '0.9rem', letterSpacing: '0.1em', color: '#1a3a1a' }}>
-          SMARTDATAGRID_
+          LOCAL GHOST_
         </span>
         <span>
           @huggingface/transformers · WebGPU → WASM → Server ·{' '}

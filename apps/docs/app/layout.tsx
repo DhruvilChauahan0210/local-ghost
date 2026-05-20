@@ -2,9 +2,9 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'SmartDataGrid — Browser-Native AI Data Filtering',
+  title: 'Local Ghost — Browser-Native AI Components',
   description:
-    'WebGPU-accelerated, on-device AI data grid. Natural language queries, zero server, zero cost, 100% private.',
+    'Local Ghost: WebGPU-powered AI components for React. Natural language filtering, form auto-fill, and charts — zero server, zero cost, 100% on-device.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
