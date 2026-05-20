@@ -15,9 +15,10 @@ function openDB(): Promise<IDBDatabase> {
 }
 
 // Stable cache key — lowercase, collapsed whitespace, base64 encoded
+// unescape(encodeURIComponent()) converts Unicode → Latin1 safe string before btoa
 export function cacheKey(input: string, schema: string): string {
   const normalized = `${schema}::${input.trim().toLowerCase().replace(/\s+/g, ' ')}`;
-  return `lg_${btoa(normalized)}`;
+  return `lg_${btoa(unescape(encodeURIComponent(normalized)))}`;
 }
 
 export async function getCached<T>(key: string): Promise<T | null> {
