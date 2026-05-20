@@ -90,12 +90,7 @@ function AIStatusBadge({
     );
   }
 
-  return (
-    <div className="flex items-center gap-2 rounded-full bg-slate-700/50 border border-slate-600/30 px-3 py-1.5 text-xs font-medium text-slate-400">
-      <span className="h-2 w-2 rounded-full bg-slate-500" aria-hidden="true" />
-      <span>Initializing&hellip;</span>
-    </div>
-  );
+  return null;
 }
 
 function CellValue({ value }: { value: unknown }) {
@@ -200,6 +195,28 @@ export function SmartDataGrid({ data }: SmartDataGridProps) {
             error={ai.error}
           />
         </div>
+
+        {ai.status === 'uninitialized' && (
+          <div className="mb-3 flex items-center justify-between rounded-lg border border-slate-700/60 bg-slate-800/40 px-4 py-3">
+            <div>
+              <p className="text-sm font-medium text-slate-200">Enable Local AI</p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Runs 100% in your browser &mdash; no server, no API key.
+                Downloads ~300MB once, then cached forever.
+              </p>
+            </div>
+            <button
+              onClick={ai.initAI}
+              className="ml-4 shrink-0 flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-md transition-all hover:bg-indigo-500 active:scale-95"
+            >
+              <svg className="h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path d="M10.75 2.75a.75.75 0 00-1.5 0v8.614L6.295 8.235a.75.75 0 10-1.09 1.03l4.25 4.5a.75.75 0 001.09 0l4.25-4.5a.75.75 0 00-1.09-1.03l-2.955 3.129V2.75z" />
+                <path d="M3.5 12.75a.75.75 0 00-1.5 0v2.5A2.75 2.75 0 004.75 18h10.5A2.75 2.75 0 0018 15.25v-2.5a.75.75 0 00-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5z" />
+              </svg>
+              Enable AI (~300MB)
+            </button>
+          </div>
+        )}
 
         <div className="flex gap-2">
           <input

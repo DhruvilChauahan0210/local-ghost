@@ -20,6 +20,7 @@ interface QueryResolver {
 }
 
 interface WebGPUAIContextValue extends AIState {
+  initAI: () => void;
   runQuery: (schema: string, userInput: string) => Promise<string>;
 }
 
@@ -41,7 +42,9 @@ export function WebGPUAIProvider({ children }: { children: ReactNode }) {
   const workerRef = useRef<Worker | null>(null);
   const pendingQueryRef = useRef<QueryResolver | null>(null);
 
-  useEffect(() => {
+  const initAI = useCallback(() => {
+    if (aiState.status !== 'uninitialized') return;
+
     if (typeof navigator.gpu === 'undefined') {
       setAiState({
         status: 'error',
@@ -107,9 +110,11 @@ export function WebGPUAIProvider({ children }: { children: ReactNode }) {
 
     setAiState({ status: 'loading', progress: 0, error: null });
     worker.postMessage({ type: 'INIT' });
+  }, [aiState.status]);
 
+  useEffect(() => {
     return () => {
-      worker.terminate();
+      workerRef.current?.terminate();
       workerRef.current = null;
     };
   }, []);
@@ -138,6 +143,7 @@ export function WebGPUAIProvider({ children }: { children: ReactNode }) {
 
   const contextValue: WebGPUAIContextValue = {
     ...aiState,
+    initAI,
     runQuery,
   };
 
