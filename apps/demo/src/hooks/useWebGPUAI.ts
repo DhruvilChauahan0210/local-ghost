@@ -8,6 +8,7 @@ export interface UseWebGPUAIReturn extends AIState {
   runQuery:    (schema: string, userInput: string) => Promise<{ code: string; usedFallback: boolean }>;
   extractJSON: (schema: string, userInput: string) => Promise<Record<string, string>>;
   analyzeData: (schema: string, userInput: string) => Promise<AnalysisResult>;
+  // systemLogs is part of AIState (inherited)
 }
 
 export function useWebGPUAI(): UseWebGPUAIReturn {

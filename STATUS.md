@@ -45,6 +45,19 @@ Last updated: 2026-05-21
 
 ---
 
+## Phase 5: Advanced Performance Engineering — ✅ Complete
+
+| Task | Status | Notes |
+|---|---|---|
+| VRAM idle timer (5 min dispose) | ✅ Done | `resetIdleTimer()` in worker — calls `generator.dispose()` after 5 min inactivity, posts `SYSTEM_STATUS: disposed` |
+| IndexedDB semantic cache | ✅ Done | `src/utils/queryCache.ts` — normalized key, cache interception in context for all 3 query types, 0ms on cache hit |
+| Terminal log streaming | ✅ Done | `[LG_SYSTEM]` log lines during init — descriptive progress instead of raw %, shown in shared `AIStatusBadge` |
+| Shared `AIStatusBadge` component | ✅ Done | Extracted to `components/AIStatusBadge.tsx`, used by all 3 components |
+| `disposed` status state | ✅ Done | New AI state — shows amber badge + re-enables "Enable AI" button after VRAM purge |
+| Cache hit indicator | ✅ Done | `[LG_CACHE] Cache hit — returning in 0ms` log line when served from IndexedDB |
+
+---
+
 ## Phase 4: Launch — ✅ Complete
 
 | Task | Status | Notes |

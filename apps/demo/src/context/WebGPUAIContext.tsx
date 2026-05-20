@@ -1,33 +1,32 @@
 import {
   createContext, useContext, useEffect, useRef, useState, useCallback, type ReactNode,
 } from 'react';
+import { cacheKey, getCached, setCached } from '../utils/queryCache';
 
 export interface AIState {
-  status: 'uninitialized' | 'loading' | 'ready' | 'error';
+  status: 'uninitialized' | 'loading' | 'ready' | 'error' | 'disposed';
   progress: number;
   error: string | null;
   mode: 'webgpu' | 'wasm' | 'server' | null;
+  systemLogs: string[];
 }
 
 export interface AnalysisResult {
   action: 'chart' | 'filter';
-  // chart fields
   type?: 'bar' | 'line' | 'pie';
   xKey?: string;
   yKey?: string;
   aggregation?: 'count' | 'avg' | 'sum' | 'max' | 'min';
-  // filter fields
   field?: string;
   op?: '>' | '<' | '=' | 'contains';
   value?: string | number;
-  // shared
   title?: string;
 }
 
 interface Resolver<T> { resolve: (v: T) => void; reject: (r: string) => void; }
 
 interface WebGPUAIContextValue extends AIState {
-  initAI: () => void;
+  initAI:      () => void;
   runQuery:    (schema: string, userInput: string) => Promise<{ code: string; usedFallback: boolean }>;
   extractJSON: (schema: string, userInput: string) => Promise<Record<string, string>>;
   analyzeData: (schema: string, userInput: string) => Promise<AnalysisResult>;
@@ -35,10 +34,12 @@ interface WebGPUAIContextValue extends AIState {
 
 type WorkerMessage =
   | { type: 'PROGRESS';        progress: number }
-  | { type: 'READY' }
+  | { type: 'READY';           device?: string }
   | { type: 'QUERY_RESULT';    code: string; usedFallback: boolean }
   | { type: 'JSON_RESULT';     data: Record<string, string> }
   | { type: 'ANALYSIS_RESULT'; result: AnalysisResult }
+  | { type: 'LOG';             message: string }
+  | { type: 'SYSTEM_STATUS';   status: 'disposed' | 'active' }
   | { type: 'ERROR';           message: string };
 
 export interface WebGPUAIProviderProps {
@@ -46,16 +47,22 @@ export interface WebGPUAIProviderProps {
   serverFallbackUrl?: string;
 }
 
+const MAX_LOGS = 12;
+const addLog = (prev: string[], msg: string): string[] =>
+  [...prev, msg].slice(-MAX_LOGS);
+
 const WebGPUAIContext = createContext<WebGPUAIContextValue | null>(null);
 
 export function WebGPUAIProvider({ children, serverFallbackUrl }: WebGPUAIProviderProps) {
-  const [aiState, setAiState] = useState<AIState>({ status: 'uninitialized', progress: 0, error: null, mode: null });
+  const [aiState, setAiState] = useState<AIState>({
+    status: 'uninitialized', progress: 0, error: null, mode: null, systemLogs: [],
+  });
 
-  const workerRef       = useRef<Worker | null>(null);
-  const queryRef        = useRef<Resolver<{ code: string; usedFallback: boolean }> | null>(null);
-  const jsonRef         = useRef<Resolver<Record<string, string>> | null>(null);
-  const analysisRef     = useRef<Resolver<AnalysisResult> | null>(null);
-  const fallbackUrlRef  = useRef(serverFallbackUrl);
+  const workerRef      = useRef<Worker | null>(null);
+  const queryRef       = useRef<Resolver<{ code: string; usedFallback: boolean }> | null>(null);
+  const jsonRef        = useRef<Resolver<Record<string, string>> | null>(null);
+  const analysisRef    = useRef<Resolver<AnalysisResult> | null>(null);
+  const fallbackUrlRef = useRef(serverFallbackUrl);
   fallbackUrlRef.current = serverFallbackUrl;
 
   const rejectAll = (msg: string) => {
@@ -65,7 +72,7 @@ export function WebGPUAIProvider({ children, serverFallbackUrl }: WebGPUAIProvid
   };
 
   const initAI = useCallback(() => {
-    if (aiState.status !== 'uninitialized') return;
+    if (aiState.status !== 'uninitialized' && aiState.status !== 'disposed') return;
 
     const hasWebGPU = typeof navigator !== 'undefined' && 'gpu' in navigator;
     const worker = new Worker(new URL('../workers/ai.worker.ts', import.meta.url), { type: 'module' });
@@ -77,8 +84,15 @@ export function WebGPUAIProvider({ children, serverFallbackUrl }: WebGPUAIProvid
         case 'PROGRESS':
           setAiState(p => ({ ...p, status: 'loading', progress: msg.progress }));
           break;
+        case 'LOG':
+          setAiState(p => ({ ...p, systemLogs: addLog(p.systemLogs, msg.message) }));
+          break;
         case 'READY':
-          setAiState(p => ({ ...p, status: 'ready', progress: 100, error: null, mode: hasWebGPU ? 'webgpu' : 'wasm' }));
+          setAiState(p => ({
+            ...p, status: 'ready', progress: 100, error: null,
+            mode: hasWebGPU ? 'webgpu' : 'wasm',
+            systemLogs: addLog(p.systemLogs, '[LG_SYSTEM] Local Ghost is active. System running on native hardware.'),
+          }));
           break;
         case 'QUERY_RESULT':
           queryRef.current?.resolve({ code: msg.code, usedFallback: msg.usedFallback });
@@ -91,6 +105,14 @@ export function WebGPUAIProvider({ children, serverFallbackUrl }: WebGPUAIProvid
         case 'ANALYSIS_RESULT':
           analysisRef.current?.resolve(msg.result);
           analysisRef.current = null;
+          break;
+        case 'SYSTEM_STATUS':
+          if (msg.status === 'disposed') {
+            setAiState(p => ({
+              ...p, status: 'disposed', mode: null, progress: 0,
+              systemLogs: addLog(p.systemLogs, '[LG_SYSTEM] VRAM purged — 5 min idle. Click Enable AI to reload.'),
+            }));
+          }
           break;
         case 'ERROR':
           if (fallbackUrlRef.current) {
@@ -108,38 +130,71 @@ export function WebGPUAIProvider({ children, serverFallbackUrl }: WebGPUAIProvid
       if (fallbackUrlRef.current) {
         setAiState(p => ({ ...p, status: 'ready', progress: 100, error: null, mode: 'server' }));
       } else {
-        setAiState({ status: 'error', progress: 0, error: message, mode: null });
+        setAiState({ status: 'error', progress: 0, error: message, mode: null, systemLogs: [] });
       }
       rejectAll(message);
     };
 
-    setAiState({ status: 'loading', progress: 0, error: null, mode: null });
+    setAiState(p => ({ ...p, status: 'loading', progress: 0, error: null, systemLogs: [] }));
     worker.postMessage({ type: 'INIT' });
   }, [aiState.status]);
 
   useEffect(() => () => { workerRef.current?.terminate(); workerRef.current = null; }, []);
 
+  // ── runQuery with IndexedDB cache interception ────────────────────────────
   const runQuery = useCallback((schema: string, userInput: string) =>
-    new Promise<{ code: string; usedFallback: boolean }>((resolve, reject) => {
+    new Promise<{ code: string; usedFallback: boolean }>(async (resolve, reject) => {
+      const key = cacheKey(userInput, schema);
+      const cached = await getCached<{ code: string; usedFallback: boolean }>(key);
+      if (cached) {
+        setAiState(p => ({ ...p, systemLogs: addLog(p.systemLogs, `[LG_CACHE] Cache hit — returning in 0ms`) }));
+        resolve(cached);
+        return;
+      }
       if (!workerRef.current) { reject('AI not initialized'); return; }
       if (queryRef.current)   { reject('Query already in progress'); return; }
-      queryRef.current = { resolve, reject };
+      queryRef.current = {
+        resolve: async (result) => { await setCached(key, result); resolve(result); },
+        reject,
+      };
       workerRef.current.postMessage({ type: 'RUN_QUERY', schema, userInput });
     }), []);
 
+  // ── extractJSON with cache ────────────────────────────────────────────────
   const extractJSON = useCallback((schema: string, userInput: string) =>
-    new Promise<Record<string, string>>((resolve, reject) => {
+    new Promise<Record<string, string>>(async (resolve, reject) => {
+      const key = cacheKey(userInput, schema);
+      const cached = await getCached<Record<string, string>>(key);
+      if (cached) {
+        setAiState(p => ({ ...p, systemLogs: addLog(p.systemLogs, `[LG_CACHE] Cache hit — returning in 0ms`) }));
+        resolve(cached);
+        return;
+      }
       if (!workerRef.current) { reject('AI not initialized'); return; }
       if (jsonRef.current)    { reject('Extraction already in progress'); return; }
-      jsonRef.current = { resolve, reject };
+      jsonRef.current = {
+        resolve: async (result) => { await setCached(key, result); resolve(result); },
+        reject,
+      };
       workerRef.current.postMessage({ type: 'EXTRACT_JSON', schema, userInput });
     }), []);
 
+  // ── analyzeData with cache ────────────────────────────────────────────────
   const analyzeData = useCallback((schema: string, userInput: string) =>
-    new Promise<AnalysisResult>((resolve, reject) => {
-      if (!workerRef.current)    { reject('AI not initialized'); return; }
-      if (analysisRef.current)   { reject('Analysis already in progress'); return; }
-      analysisRef.current = { resolve, reject };
+    new Promise<AnalysisResult>(async (resolve, reject) => {
+      const key = cacheKey(userInput, schema);
+      const cached = await getCached<AnalysisResult>(key);
+      if (cached) {
+        setAiState(p => ({ ...p, systemLogs: addLog(p.systemLogs, `[LG_CACHE] Cache hit — returning in 0ms`) }));
+        resolve(cached);
+        return;
+      }
+      if (!workerRef.current)  { reject('AI not initialized'); return; }
+      if (analysisRef.current) { reject('Analysis already in progress'); return; }
+      analysisRef.current = {
+        resolve: async (result) => { await setCached(key, result); resolve(result); },
+        reject,
+      };
       workerRef.current.postMessage({ type: 'ANALYZE_DATA', schema, userInput });
     }), []);
 

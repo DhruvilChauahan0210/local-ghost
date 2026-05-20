@@ -1,97 +1,12 @@
 import { useState, useCallback, useRef } from 'react';
 import { useWebGPUAI } from '../hooks/useWebGPUAI';
+import { AIStatusBadge } from './AIStatusBadge';
 
 interface SmartDataGridProps {
   data: Record<string, unknown>[];
 }
 
 type QueryStatus = 'idle' | 'running' | 'error';
-
-function AIStatusBadge({
-  status,
-  progress,
-  error,
-}: {
-  status: 'uninitialized' | 'loading' | 'ready' | 'error';
-  progress: number;
-  error: string | null;
-}) {
-  if (status === 'loading') {
-    return (
-      <div className="flex items-center gap-2 rounded-full bg-indigo-500/10 border border-indigo-500/30 px-3 py-1.5 text-xs font-medium text-indigo-300">
-        <svg
-          className="h-3.5 w-3.5 animate-spin"
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-        >
-          <circle
-            className="opacity-25"
-            cx="12"
-            cy="12"
-            r="10"
-            stroke="currentColor"
-            strokeWidth="4"
-          />
-          <path
-            className="opacity-75"
-            fill="currentColor"
-            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-          />
-        </svg>
-        <span>Loading model&hellip; {progress}%</span>
-      </div>
-    );
-  }
-
-  if (status === 'ready') {
-    return (
-      <div className="flex items-center gap-2 rounded-full bg-emerald-500/10 border border-emerald-500/30 px-3 py-1.5 text-xs font-medium text-emerald-300">
-        <svg
-          className="h-3.5 w-3.5"
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 20 20"
-          fill="currentColor"
-          aria-hidden="true"
-        >
-          <path
-            fillRule="evenodd"
-            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
-            clipRule="evenodd"
-          />
-        </svg>
-        <span>AI Ready &mdash; WebGPU</span>
-      </div>
-    );
-  }
-
-  if (status === 'error') {
-    return (
-      <div
-        className="flex items-center gap-2 rounded-full bg-red-500/10 border border-red-500/30 px-3 py-1.5 text-xs font-medium text-red-300"
-        title={error ?? 'Unknown error'}
-      >
-        <svg
-          className="h-3.5 w-3.5"
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 20 20"
-          fill="currentColor"
-          aria-hidden="true"
-        >
-          <path
-            fillRule="evenodd"
-            d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z"
-            clipRule="evenodd"
-          />
-        </svg>
-        <span>AI Unavailable</span>
-      </div>
-    );
-  }
-
-  return null;
-}
 
 function CellValue({ value }: { value: unknown }) {
   if (value === null || value === undefined) {
@@ -195,10 +110,12 @@ export function SmartDataGrid({ data }: SmartDataGridProps) {
             status={ai.status}
             progress={ai.progress}
             error={ai.error}
+            mode={ai.mode}
+            systemLogs={ai.systemLogs}
           />
         </div>
 
-        {ai.status === 'uninitialized' && (
+        {(ai.status === 'uninitialized' || ai.status === 'disposed') && (
           <div className="mb-3 flex items-center justify-between rounded-lg border border-slate-700/60 bg-slate-800/40 px-4 py-3">
             <div>
               <p className="text-sm font-medium text-slate-200">Enable Local AI</p>
