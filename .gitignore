@@ -35,3 +35,9 @@ Thumbs.db
 # Cache
 .eslintcache
 .cache/
+
+# Turbo
+.turbo/
+
+# Package build output
+packages/*/dist/

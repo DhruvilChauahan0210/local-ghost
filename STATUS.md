@@ -22,15 +22,15 @@ Last updated: 2026-05-21
 
 ---
 
-## Phase 2: NPM Package — ⬜ Not Started
+## Phase 2: NPM Package — ✅ Complete
 
 | Task | Status | Notes |
 |---|---|---|
-| Turborepo monorepo setup | ⬜ Pending | |
-| `/packages/smart-data-grid` ESM + CJS build | ⬜ Pending | |
-| Web Worker offload into package | ⬜ Pending | |
-| `/apps/documentation` (Next.js / Docusaurus) | ⬜ Pending | |
-| Interactive live sandboxes (StackBlitz / CodeSandbox) | ⬜ Pending | |
+| Turborepo monorepo setup | ✅ Done | npm workspaces + turbo.json pipeline |
+| `/packages/smart-data-grid` ESM + CJS build | ✅ Done | vite lib mode, dual exports, .d.ts generated |
+| Web Worker offload into package | ✅ Done | ai.worker.ts included in package src |
+| `/apps/documentation` (Next.js) | ✅ Done | apps/docs with hero page |
+| Interactive live sandboxes (StackBlitz / CodeSandbox) | ⬜ Pending | Phase 4 concern |
 
 ---
 
