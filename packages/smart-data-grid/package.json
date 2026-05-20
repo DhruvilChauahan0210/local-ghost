@@ -1,6 +1,17 @@
 {
   "name": "@webgpu-ui/smart-data-grid",
   "version": "0.1.0",
+  "description": "Browser-native AI data components powered by WebGPU. Natural language filtering, form auto-fill, and chart generation — zero server round-trips.",
+  "keywords": ["webgpu", "ai", "react", "data-grid", "transformers", "llm", "browser-ai", "zero-server", "privacy"],
+  "homepage": "https://github.com/DhruvilChauahan0210/local-ghost",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DhruvilChauahan0210/local-ghost.git"
+  },
+  "license": "MIT",
+  "sideEffects": false,
+  "engines": { "node": ">=18.0.0" },
+  "publishConfig": { "access": "public" },
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",

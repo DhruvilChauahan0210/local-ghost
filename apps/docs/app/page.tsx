@@ -183,26 +183,31 @@ export default function HomePage() {
           ))}
         </section>
 
-        {/* ── QUICK START ── */}
-        <div className="section-divider"><span>// QUICK START</span></div>
+        {/* ── INSTALL ── */}
+        <div className="section-divider"><span>// INSTALL</span></div>
         <section id="install" className="code-section">
           <div className="code-block">
-            <div className="code-label">INSTALL</div>
+            <div className="code-label">NPM</div>
             <pre>
               <code>
                 <span className="c-muted">$</span>
                 {' npm install '}
                 <span className="c-green">@webgpu-ui/smart-data-grid</span>
+                {'\n'}
+                <span className="c-muted">#</span>
+                {' peer deps: react ^18, recharts ^2'}
               </code>
             </pre>
           </div>
 
           <div className="code-block">
-            <div className="code-label">USAGE</div>
+            <div className="code-label">QUICK START</div>
             <pre>
               <code>
                 {'import '}
-                <span className="c-orange">{'{ SmartDataGrid, WebGPUAIProvider }'}</span>
+                <span className="c-orange">{'{ WebGPUAIProvider, SmartDataGrid,'}</span>
+                {'\n         '}
+                <span className="c-orange">{'SmartForm, SmartAnalytics }'}</span>
                 {'\n  from '}
                 <span className="c-green">&apos;@webgpu-ui/smart-data-grid&apos;</span>
                 {';\n\nexport default function '}
@@ -210,7 +215,17 @@ export default function HomePage() {
                 {'() {\n  return (\n    '}
                 <span className="c-green">{'<WebGPUAIProvider>'}</span>
                 {'\n      '}
+                <span className="c-muted">{'/* natural language → filtered table */'}</span>
+                {'\n      '}
                 <span className="c-green">{'<SmartDataGrid data={myData} />'}</span>
+                {'\n\n      '}
+                <span className="c-muted">{'/* paste text → auto-filled form */'}</span>
+                {'\n      '}
+                <span className="c-green">{'<SmartForm fields={fields} onSubmit={save} />'}</span>
+                {'\n\n      '}
+                <span className="c-muted">{'/* natural language → chart */'}</span>
+                {'\n      '}
+                <span className="c-green">{'<SmartAnalytics data={myData} />'}</span>
                 {'\n    '}
                 <span className="c-green">{'</WebGPUAIProvider>'}</span>
                 {'\n  );\n}'}

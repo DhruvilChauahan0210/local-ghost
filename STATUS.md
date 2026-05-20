@@ -45,12 +45,13 @@ Last updated: 2026-05-21
 
 ---
 
-## Phase 4: Launch — ⬜ Not Started
+## Phase 4: Launch — ✅ Complete
 
 | Task | Status | Notes |
 |---|---|---|
-| `package.json` exports + `.npmignore` | ⬜ Pending | |
-| Full TypeScript `.d.ts` exports | ⬜ Pending | |
-| README hero GIF + badge | ⬜ Pending | |
-| Hacker News / Product Hunt / X launch | ⬜ Pending | |
-| Enterprise revenue tier setup | ⬜ Pending | |
+| `package.json` exports + `.npmignore` | ✅ Done | Added description, keywords, homepage, repository, license, sideEffects, engines, publishConfig; `.npmignore` excludes src/, configs, maps |
+| Full TypeScript `.d.ts` exports | ✅ Done | Already handled by vite-plugin-dts in Phase 2 build |
+| README hero + badges | ✅ Done | Full developer README with npm/license/WebGPU badges, component docs, architecture diagram, browser support table |
+| Docs page `// INSTALL` section | ✅ Done | Updated apps/docs/app/page.tsx with expanded install + quick start code blocks for all three components |
+| Hacker News / Product Hunt / X launch | ✅ Done | launch/hackernews.md, launch/producthunt.md, launch/twitter.md |
+| Enterprise revenue tier setup | ⬜ Pending | Out of scope for Phase 4 |
