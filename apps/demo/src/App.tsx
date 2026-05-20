@@ -96,16 +96,16 @@ export default function App() {
           }}>
             SMARTDATAGRID
           </span>
-          <span style={{ fontSize: '0.6rem', color: 'var(--muted)', letterSpacing: '0.12em', textTransform: 'uppercase', borderLeft: '1px solid var(--border)', paddingLeft: '0.75rem' }}>
+          <span style={{ fontSize: '0.6rem', color: 'var(--text-3)', letterSpacing: '0.12em', textTransform: 'uppercase', borderLeft: '1px solid var(--border)', paddingLeft: '0.75rem' }}>
             Live Demo
           </span>
         </a>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <span style={{ fontFamily: 'var(--font)', fontSize: '0.65rem', color: 'var(--muted)', letterSpacing: '0.1em' }}>
+          <span style={{ fontFamily: 'var(--font)', fontSize: '0.65rem', color: 'var(--text-3)', letterSpacing: '0.1em' }}>
             v0.1.0
           </span>
           <a href="https://github.com" style={{
-            fontFamily: 'var(--font)', fontSize: '0.7rem', color: 'var(--muted)',
+            fontFamily: 'var(--font)', fontSize: '0.7rem', color: 'var(--text-2)',
             textDecoration: 'none', letterSpacing: '0.08em',
             border: '1px solid var(--border)', padding: '0.3rem 0.65rem',
           }}>
@@ -140,7 +140,7 @@ export default function App() {
               textShadow: '0 0 30px rgba(0,255,65,0.25)',
             }}>NATIVE AI.</span>
           </h1>
-          <p style={{ fontSize: '0.8rem', color: 'var(--muted)', lineHeight: 1.9, maxWidth: '480px' }}>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-2)', lineHeight: 1.9, maxWidth: '480px' }}>
             Three components. Zero servers. Runs entirely on your GPU.<br />
             Switch tabs to test each one live.
           </p>
@@ -172,13 +172,13 @@ export default function App() {
                   transition: 'all 0.15s',
                 }}
               >
-                <div style={{ fontSize: '0.6rem', color: isActive ? 'var(--green-dim)' : 'var(--muted)', letterSpacing: '0.14em', marginBottom: '0.2rem' }}>
+                <div style={{ fontSize: '0.6rem', color: isActive ? 'var(--green-dim)' : 'var(--text-3)', letterSpacing: '0.14em', marginBottom: '0.2rem' }}>
                   {t.num}
                 </div>
                 <div style={{
                   fontFamily: 'var(--font-display)',
                   fontSize: '1.05rem', letterSpacing: '0.06em',
-                  color: isActive ? 'var(--green)' : '#4a7a4a',
+                  color: isActive ? 'var(--green)' : 'var(--text-2)',
                   textShadow: isActive ? '0 0 10px rgba(0,255,65,0.3)' : 'none',
                 }}>
                   {t.label}
@@ -200,14 +200,14 @@ export default function App() {
             borderBottom: '1px solid var(--border)',
             display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem',
           }}>
-            <p style={{ fontSize: '0.72rem', color: 'var(--muted)', letterSpacing: '0.04em' }}>
+            <p style={{ fontSize: '0.72rem', color: 'var(--text-2)', letterSpacing: '0.04em' }}>
               {tab.desc}
             </p>
             <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
               {tab.examples.slice(0, 3).map(ex => (
                 <span key={ex} style={{
                   fontSize: '0.6rem', fontFamily: 'var(--font)',
-                  color: 'var(--muted)', letterSpacing: '0.04em',
+                  color: 'var(--text-3)', letterSpacing: '0.04em',
                   border: '1px solid var(--border)',
                   padding: '0.2rem 0.5rem', background: 'var(--surface-2)',
                 }}>
@@ -248,7 +248,7 @@ export default function App() {
           display: 'flex', alignItems: 'center', gap: '1rem',
           margin: '3rem 0 2rem',
           fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.16em',
-          color: 'var(--muted)',
+          color: 'var(--text-3)',
         }}>
           <span style={{ flex: 1, height: '1px', background: 'var(--border)' }} />
           <span>// STACK</span>
@@ -275,7 +275,7 @@ export default function App() {
                 textShadow: '0 0 20px rgba(0,255,65,0.2)',
                 lineHeight: 1, marginBottom: '0.25rem',
               }}>{v}</div>
-              <div style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.12em', color: 'var(--muted)', textTransform: 'uppercase' }}>{l}</div>
+              <div style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.12em', color: 'var(--text-3)', textTransform: 'uppercase' }}>{l}</div>
             </div>
           ))}
         </div>
@@ -288,7 +288,7 @@ export default function App() {
         padding: '1.5rem 2rem',
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         flexWrap: 'wrap', gap: '0.5rem',
-        fontSize: '0.65rem', color: 'var(--muted)', letterSpacing: '0.06em',
+        fontSize: '0.65rem', color: 'var(--text-3)', letterSpacing: '0.06em',
       }}>
         <span style={{ fontFamily: 'var(--font-display)', fontSize: '0.9rem', letterSpacing: '0.1em', color: '#1a3a1a' }}>
           SMARTDATAGRID_
