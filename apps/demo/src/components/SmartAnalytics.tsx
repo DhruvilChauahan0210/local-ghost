@@ -311,6 +311,7 @@ export function SmartAnalytics({ data, className = '' }: SmartAnalyticsProps) {
         )}
       </div>
 
+      {/* Chart */}
       {chartStatus === 'done' && chartConfig && (
         <div className="mt-4 rounded-xl border border-slate-700/60 bg-[#1a1d27] p-5 shadow-xl">
           <div className="mb-4 flex items-center justify-between">
@@ -326,12 +327,51 @@ export function SmartAnalytics({ data, className = '' }: SmartAnalyticsProps) {
       )}
 
       {chartStatus === 'idle' && (
-        <div className="mt-4 flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-700/40 bg-[#1a1d27]/50 p-10 text-center">
+        <div className="mt-4 flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-700/40 bg-[#1a1d27]/50 p-8 text-center">
           <svg className="mb-3 h-10 w-10 text-slate-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/></svg>
           <p className="text-sm text-slate-500">Describe a chart in plain English</p>
           <p className="mt-1 text-xs text-slate-600">"average salary by role" · "count by city" · "salary pie by role"</p>
         </div>
       )}
+
+      {/* Raw data table — always visible */}
+      <div className="mt-4 rounded-xl border border-slate-700/60 bg-[#1a1d27] shadow-xl overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-700/60">
+          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+            Source Data
+          </span>
+          <span className="text-xs text-slate-600">{data.length} rows · {columns.length} columns</span>
+        </div>
+        <div className="overflow-x-auto max-h-64 overflow-y-auto table-sticky-header">
+          <table className="w-full min-w-full border-collapse text-xs">
+            <thead>
+              <tr className="border-b border-slate-700/80 bg-[#1a1d27]">
+                {columns.map(col => (
+                  <th key={col} className="whitespace-nowrap px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
+                    {col}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((row, i) => (
+                <tr
+                  key={i}
+                  className={i % 2 === 0 ? 'bg-transparent hover:bg-slate-800/40 transition-colors' : 'bg-slate-800/20 hover:bg-slate-800/50 transition-colors'}
+                >
+                  {columns.map(col => (
+                    <td key={col} className="whitespace-nowrap px-4 py-2 text-slate-300">
+                      {typeof row[col] === 'number'
+                        ? <span className="font-mono text-sky-300 tabular-nums">{(row[col] as number).toLocaleString()}</span>
+                        : String(row[col] ?? '')}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }
