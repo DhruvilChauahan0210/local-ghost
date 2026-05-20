@@ -1,5 +1,5 @@
 {
-  "name": "local-ghost",
+  "name": "@dhruvil0210/local-ghost",
   "version": "0.1.0",
   "description": "Local Ghost — browser-native AI components for React. Natural language filtering, form auto-fill, and chart generation powered by WebGPU. Zero server. Zero API keys.",
   "keywords": [

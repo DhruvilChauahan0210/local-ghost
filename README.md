@@ -56,7 +56,7 @@ Natural language to Recharts visualizations.
 ## Installation
 
 ```bash
-npm install local-ghost
+npm install @dhruvil0210/local-ghost
 ```
 
 Peer dependencies: `react ^18`, `recharts ^2`
@@ -66,7 +66,7 @@ Peer dependencies: `react ^18`, `recharts ^2`
 ## Quick Start
 
 ```tsx
-import { WebGPUAIProvider, SmartDataGrid } from 'local-ghost';
+import { WebGPUAIProvider, SmartDataGrid } from '@dhruvil0210/local-ghost';
 
 export default function App() {
   return (
