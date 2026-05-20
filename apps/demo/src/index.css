@@ -172,7 +172,7 @@
 /* Tier 1 — primary (17:1) */
 .terminal-wrap [class*="text-slate-100"],
 .terminal-wrap [class*="text-slate-200"],
-.terminal-wrap [class*="text-white"] { color: var(--text) !important; }
+.terminal-wrap [class*="text-white"]:not([class*="bg-indigo-600"]) { color: var(--text) !important; }
 
 /* Tier 2 — secondary (9.5:1) */
 .terminal-wrap [class*="text-slate-300"] { color: var(--text-2) !important; }
