@@ -4,6 +4,9 @@ import { pipeline, env } from '@huggingface/transformers';
 
 env.useBrowserCache = true;
 env.allowLocalModels = false;
+// Suppress ONNX Runtime node-assignment warnings (expected for quantized models)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+(env as any).backends = { ...(env as any).backends, onnx: { wasm: { logLevel: 'error' } } };
 
 type IncomingMessage =
   | { type: 'INIT' }
