@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 2026-05-21
+Last updated: 2026-05-21 (v1.2.0)
 
 ---
 
@@ -160,6 +160,35 @@ Last updated: 2026-05-21
 | Package name corrected | ✅ Done | `@dhruvil0210/local-ghost` throughout (was `local-ghost`) |
 | `analyzeData()` code block | ✅ Done | Direct API usage example added to install section |
 | Responsive CSS | ✅ Done | changelog + action-grid collapse to 1 column on mobile |
+
+---
+
+## Phase 9: Hardening & Fault Tolerance Architecture — ✅ Complete (v1.2.0)
+
+| Task | Status | Notes |
+|---|---|---|
+| WebGPU device-lost hot swap | ✅ Done | `glDevice` (separate `GPUDevice` handle) registered via `adapter.requestDevice()` — `glDevice.lost.then(handleDeviceLost)` fires on OS sleep, VRAM spike, driver crash, or tab freeze |
+| `handleDeviceLost()` recovery flow | ✅ Done | Cancels idle timer → disposes pipeline (ignores errors — device already gone) → posts `SYSTEM_STATUS: 'hotswap'` → reinits WASM pipeline → posts `READY: 'wasm'` |
+| UI hot-swap transparency | ✅ Done | Context handles `hotswap` by transitioning to `loading` + logging `[LG_HARDENING] WebGPU context lost. Hot-swapping to WASM...` — user sees loading bar briefly, then "AI Ready — WASM" with no action needed |
+| READY mode reflects actual runtime | ✅ Done | Context reads `msg.device` from `READY` message — mode correctly shows `wasm` after a hot-swap instead of wrongly reporting `webgpu` |
+| `AIState.isProcessing` lock | ✅ Done | Boolean exported on AIState — `true` while any worker request is in-flight; set in all dispatch entry points and cleared in every resolve/reject path |
+| Concurrency drop on busy lock | ✅ Done | All three dispatchers (`runQuery`, `extractJSON`, `analyzeData`) reject immediately with a clear message if a ref is already occupied — no stale promise left dangling |
+| `setProcessing(false)` on all failure paths | ✅ Done | `QUERY_ERROR`, `JSON_ERROR`, `ANALYSIS_ERROR`, `hotswap`, `disposed`, `worker.onerror` all reset `isProcessing` — lock never gets permanently stuck |
+| Cache hits bypass lock | ✅ Done | IndexedDB cache lookups short-circuit before the ref check — 0ms responses are always safe to serve concurrently |
+| Both worker and context copies updated | ✅ Done | Changes applied to both `apps/demo/src/` and `packages/smart-data-grid/src/` |
+
+---
+
+## Phase 10: Compilation Verification & Pre-Flight Checklist — ✅ Complete (v1.2.0)
+
+| Task | Status | Notes |
+|---|---|---|
+| `turbo run build --force` clean sweep | ✅ Done | 3/3 tasks successful, 0 cached — all packages built from scratch |
+| Zero `console.log` / `debugger` in bundle | ✅ Done | `grep` on `dist/index.js` returns 0 matches — esbuild drop config working |
+| Zero executable `eval()` in bundle | ✅ Done | One grep hit confirmed to be the literal string `"eval("` inside `verifyCodeSafety` blacklist array — not executable code |
+| All TypeScript `.d.ts` files present | ✅ Done | 7 declaration files: `index.d.ts`, `context/WebGPUAIContext.d.ts`, `hooks/useWebGPUAI.d.ts`, `components/SmartAnalytics.d.ts`, `components/SmartDataGrid.d.ts`, `components/SmartForm.d.ts`, `utils/sandbox.d.ts` |
+| Sourcemaps present | ✅ Done | `dist/index.js.map` + `dist/index.cjs.map` both generated |
+| Published to npm | ✅ Done | `@dhruvil0210/local-ghost@1.2.0` |
 
 ---
 
