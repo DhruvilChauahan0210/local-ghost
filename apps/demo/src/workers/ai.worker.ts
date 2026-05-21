@@ -5,9 +5,7 @@ import { pipeline, env } from '@huggingface/transformers';
 env.useBrowserCache = true;
 env.allowLocalModels = false;
 
-// ONNX Runtime emits [W:onnxruntime:] warnings directly from the WASM binary
-// via console.warn — they are expected for quantized models and cannot be
-// suppressed via env config. Filter them at the console level instead.
+// Suppress ONNX WASM binary warnings — expected for quantized models
 const _warn = console.warn.bind(console);
 console.warn = (...args: unknown[]) => {
   const msg = String(args[0] ?? '');
@@ -21,6 +19,11 @@ type IncomingMessage =
   | { type: 'EXTRACT_JSON'; schema: string; userInput: string }
   | { type: 'ANALYZE_DATA'; schema: string; userInput: string };
 
+// ERROR        = init-level failure: AI goes to 'error' state, cannot recover
+// QUERY_ERROR  = query-level failure: AI stays 'ready', only this request failed
+// JSON_ERROR   = extraction-level failure: AI stays 'ready'
+// ANALYSIS_ERROR = analysis-level failure: AI stays 'ready'
+
 let generator: TextGenerationPipeline | null = null;
 const MODEL_ID = 'onnx-community/Qwen2.5-Coder-0.5B-Instruct';
 
@@ -32,9 +35,7 @@ function resetIdleTimer(): void {
   if (idleTimer) clearTimeout(idleTimer);
   idleTimer = setTimeout(async () => {
     if (generator) {
-      if (typeof generator.dispose === 'function') {
-        await generator.dispose();
-      }
+      if (typeof generator.dispose === 'function') await generator.dispose();
       generator = null;
       log('VRAM purged after 5 min idle. Re-enable AI to reload.');
       self.postMessage({ type: 'SYSTEM_STATUS', status: 'disposed' });
@@ -47,7 +48,7 @@ function log(msg: string): void {
   self.postMessage({ type: 'LOG', message: `[LG_SYSTEM] ${msg}` });
 }
 
-// ── Model init with descriptive log streaming ─────────────────────────────────
+// ── Model init ────────────────────────────────────────────────────────────────
 async function initModel(): Promise<void> {
   const nav = navigator as Navigator & { gpu?: { requestAdapter: () => Promise<unknown> } };
   const hasWebGPU = !!nav.gpu && !!(await nav.gpu.requestAdapter().catch(() => null));
@@ -59,31 +60,21 @@ async function initModel(): Promise<void> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const cb = (p: any) => {
     const pct = Math.round(p.progress ?? 0);
-    // Send numeric progress for the bar
     self.postMessage({ type: 'PROGRESS', progress: pct });
-    // Send descriptive log lines at key moments
     if (p.status === 'initiate' && p.file !== lastFile) {
       lastFile = p.file ?? '';
       log(`Loading: ${lastFile}`);
     }
-    if (p.status === 'download') {
-      log(`Downloading model chunk... ${pct}% complete`);
-    }
-    if (p.status === 'ready') {
-      log(`Component ready: ${p.file ?? 'model'}`);
-    }
+    if (p.status === 'download') log(`Downloading model chunk... ${pct}% complete`);
+    if (p.status === 'ready')    log(`Component ready: ${p.file ?? 'model'}`);
   };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const tryInit = async (device: 'webgpu' | 'wasm', dtype: any) => {
-    if (device === 'webgpu') {
-      log(`Allocating WebGPU command buffers and VRAM shaders...`);
-    } else {
-      log(`Starting WASM inference engine (WebGPU unavailable)...`);
-    }
-    generator = await pipeline('text-generation', MODEL_ID, {
-      device, dtype, progress_callback: cb as any,
-    });
+    if (device === 'webgpu') log(`Allocating WebGPU command buffers and VRAM shaders...`);
+    else                     log(`Starting WASM inference engine (WebGPU unavailable)...`);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    generator = await pipeline('text-generation', MODEL_ID, { device, dtype, progress_callback: cb as any });
     log(`Local Ghost is active. Running on ${device.toUpperCase()}.`);
     self.postMessage({ type: 'READY', device });
     resetIdleTimer();
@@ -133,32 +124,89 @@ Rules:
 - Must start with: (data) =>
 - Use only: .filter(), .map(), .sort(), .slice()
 - No imports, no declarations, no explanations, no markdown
-- String comparisons must use .toLowerCase()
+- String comparisons: use .toLowerCase() and .includes() for partial matches
+- For role/job/department/city filters: prefer .includes() not ===
 
-Example: (data) => data.filter(row => row.age > 30).sort((a, b) => a.name.localeCompare(b.name))`;
+Example: (data) => data.filter(row => row.age > 30).sort((a, b) => a.name.localeCompare(b.name))
+Example: (data) => data.filter(row => row.role.toLowerCase().includes('engineer'))`;
+
+const STRING_FIELDS = ['city', 'role', 'department', 'country', 'status', 'type', 'job', 'title', 'category', 'gender', 'team', 'name'];
 
 function fixBrokenArrowFn(input: string, fields: string[]): string | null {
-  const q = input.toLowerCase();
+  const q = input.toLowerCase().trim();
   const parts: string[] = [];
+
+  // field > number
   const gtM = q.match(/(\w+)\s*(?:older than|greater than|more than|above|>)\s*(\d+)/);
-  if (gtM) { const f = fields.find(f => f.toLowerCase() === gtM[1]) ?? gtM[1]; parts.push(`row => row.${f} > ${gtM[2]}`); }
+  if (gtM) {
+    const f = fields.find(f => f.toLowerCase() === gtM[1]) ?? gtM[1];
+    parts.push(`row.${f} > ${gtM[2]}`);
+  }
+
+  // field < number
   const ltM = q.match(/(\w+)\s*(?:younger than|less than|below|under|<)\s*(\d+)/);
-  if (ltM) { const f = fields.find(f => f.toLowerCase() === ltM[1]) ?? ltM[1]; parts.push(`row => row.${f} < ${ltM[2]}`); }
+  if (ltM) {
+    const f = fields.find(f => f.toLowerCase() === ltM[1]) ?? ltM[1];
+    parts.push(`row.${f} < ${ltM[2]}`);
+  }
+
+  // top N
+  const topM = q.match(/top\s+(\d+)/);
+
+  // sort
   const sortM = q.match(/sort(?:ed)?\s+by\s+(\w+)(?:\s+(desc|asc))?/);
-  const sortExpr = sortM ? `.sort((a,b)=>{ const f='${fields.find(f=>f.toLowerCase()===sortM[1])??sortM[1]}'; const av=a[f],bv=b[f]; if(typeof av==='number')return (av-bv)*${sortM[2]==='desc'?-1:1}; return String(av).localeCompare(String(bv))*${sortM[2]==='desc'?-1:1}; })` : '';
-  if (!parts.length && !sortExpr) return null;
-  return `(data) => data${parts.length ? `.filter(${parts[0]})` : ''}${sortExpr}`;
+  const sortField = sortM ? (fields.find(f => f.toLowerCase() === sortM[1]) ?? sortM[1]) : null;
+  const sortDir   = sortM?.[2] === 'desc' ? -1 : 1;
+  const sortExpr  = sortField
+    ? `.sort((a,b)=>{ const av=a['${sortField}'],bv=b['${sortField}']; if(typeof av==='number')return (av-bv)*${sortDir}; return String(av).localeCompare(String(bv))*${sortDir}; })`
+    : '';
+
+  // "in X" / "from X" / "is X"
+  const eqM = q.match(/(?:in|from|with|is|=)\s+["']?([a-z][a-z\s]*)["']?/);
+  if (eqM && !gtM && !ltM) {
+    const value = eqM[1].trim();
+    const sf = fields.find(f => STRING_FIELDS.includes(f.toLowerCase()));
+    if (sf) parts.push(`String(row['${sf}']).toLowerCase().includes('${value.toLowerCase()}')`);
+  }
+
+  // "show only X" / "only X" / "filter X" / "find X" / "list X" / bare noun
+  if (!gtM && !ltM && !eqM) {
+    const showM = q.match(/(?:show\s+only|only|filter|find|list|get|display)\s+([a-z][a-z\s]*)$/);
+    const bareM = !showM ? q.match(/^([a-z][a-z\s]*)(?:\s+only)?$/) : null;
+    const rawVal = ((showM ? showM[1] : null) ?? (bareM ? bareM[1] : null) ?? '').trim().replace(/s$/, '');
+    if (rawVal && rawVal.length > 2) {
+      const sf = fields.find(f => STRING_FIELDS.includes(f.toLowerCase()));
+      if (sf) parts.push(`String(row['${sf}']).toLowerCase().includes('${rawVal.toLowerCase()}')`);
+    }
+  }
+
+  if (!parts.length && !sortExpr && !topM) return null;
+
+  const filterExpr = parts.length ? `.filter(row => ${parts.join(' && ')})` : '';
+  const sliceExpr  = topM ? `.slice(0, ${topM[1]})` : '';
+
+  // If top N without sort, sort by first numeric field descending
+  const autoSort = topM && !sortM
+    ? (() => {
+        const numField = fields.find(f => !['id','name'].includes(f.toLowerCase()));
+        return numField
+          ? `.sort((a,b)=>Number(b['${numField}'])-Number(a['${numField}']))`
+          : '';
+      })()
+    : '';
+
+  return `(data) => data${filterExpr}${autoSort}${sortExpr}${sliceExpr}`;
 }
 
 async function runQuery(schema: string, userInput: string): Promise<void> {
-  if (!generator) { self.postMessage({ type: 'ERROR', message: 'Model not ready' }); return; }
+  if (!generator) { self.postMessage({ type: 'QUERY_ERROR', message: 'Model not ready' }); return; }
   resetIdleTimer();
   const messages = [
     { role: 'system', content: GRID_PROMPT.replace('{SCHEMA}', schema) },
     { role: 'user',   content: `Request: ${userInput}\nOutput:` },
   ];
   try {
-    const raw  = stripFences(extractOutput(await generator(messages, { max_new_tokens: 200, do_sample: false, temperature: 0.1 })));
+    const raw = stripFences(extractOutput(await generator(messages, { max_new_tokens: 200, do_sample: false, temperature: 0.1 })));
     const arrowMatch = raw.match(/\(data\)\s*=>.+/s);
     const code = arrowMatch ? arrowMatch[0].trim() : raw;
     try {
@@ -166,11 +214,17 @@ async function runQuery(schema: string, userInput: string): Promise<void> {
       self.postMessage({ type: 'QUERY_RESULT', code, usedFallback: false });
     } catch {
       const fixed = fixBrokenArrowFn(userInput, schema.split(',').map(s => s.trim()));
-      if (fixed) { self.postMessage({ type: 'QUERY_RESULT', code: fixed, usedFallback: true }); }
-      else { self.postMessage({ type: 'ERROR', message: 'AI produced invalid code. Try rephrasing.' }); }
+      if (fixed) {
+        self.postMessage({ type: 'QUERY_RESULT', code: fixed, usedFallback: true });
+      } else {
+        self.postMessage({
+          type: 'QUERY_ERROR',
+          message: `Could not parse "${userInput}". Try: "age > 30", "sort by salary desc", "show only engineers"`,
+        });
+      }
     }
   } catch (err) {
-    self.postMessage({ type: 'ERROR', message: err instanceof Error ? err.message : 'Inference failed' });
+    self.postMessage({ type: 'QUERY_ERROR', message: err instanceof Error ? err.message : 'Inference failed' });
   }
 }
 
@@ -182,7 +236,7 @@ Example schema: [{"name":"email","type":"email"}]
 Example output: {"email":"alice@example.com"}`;
 
 async function extractJSON(schema: string, userInput: string): Promise<void> {
-  if (!generator) { self.postMessage({ type: 'ERROR', message: 'Model not ready' }); return; }
+  if (!generator) { self.postMessage({ type: 'JSON_ERROR', message: 'Model not ready' }); return; }
   resetIdleTimer();
   const messages = [
     { role: 'system', content: FORM_PROMPT.replace('{SCHEMA}', schema) },
@@ -195,7 +249,7 @@ async function extractJSON(schema: string, userInput: string): Promise<void> {
     try { self.postMessage({ type: 'JSON_RESULT', data: JSON.parse(jsonMatch[0]) }); }
     catch { self.postMessage({ type: 'JSON_RESULT', data: {} }); }
   } catch (err) {
-    self.postMessage({ type: 'ERROR', message: err instanceof Error ? err.message : 'Extraction failed' });
+    self.postMessage({ type: 'JSON_ERROR', message: err instanceof Error ? err.message : 'Extraction failed' });
   }
 }
 
@@ -220,7 +274,7 @@ Valid op values: >, <, =, contains
 Output ONLY the JSON object. No other text.`;
 
 async function analyzeData(schema: string, userInput: string): Promise<void> {
-  if (!generator) { self.postMessage({ type: 'ERROR', message: 'Model not ready' }); return; }
+  if (!generator) { self.postMessage({ type: 'ANALYSIS_ERROR', message: 'Model not ready' }); return; }
   resetIdleTimer();
   const messages = [
     { role: 'system', content: ANALYZE_PROMPT.replace('{SCHEMA}', schema) },
@@ -229,16 +283,22 @@ async function analyzeData(schema: string, userInput: string): Promise<void> {
   try {
     const raw = stripFences(extractOutput(await generator(messages, { max_new_tokens: 150, do_sample: false, temperature: 0.1 })));
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) { self.postMessage({ type: 'ERROR', message: 'AI could not interpret query. Try: "average salary by role"' }); return; }
+    if (!jsonMatch) {
+      self.postMessage({ type: 'ANALYSIS_ERROR', message: 'AI could not interpret query. Try: "average salary by role"' });
+      return;
+    }
     try {
       const result = JSON.parse(jsonMatch[0]) as Record<string, unknown>;
       if (result['action'] !== 'chart' && result['action'] !== 'filter') {
-        self.postMessage({ type: 'ERROR', message: 'AI returned unrecognized action. Try rephrasing.' }); return;
+        self.postMessage({ type: 'ANALYSIS_ERROR', message: 'AI returned unrecognized action. Try rephrasing.' });
+        return;
       }
       self.postMessage({ type: 'ANALYSIS_RESULT', result });
-    } catch { self.postMessage({ type: 'ERROR', message: 'AI output was not valid JSON. Try rephrasing.' }); }
+    } catch {
+      self.postMessage({ type: 'ANALYSIS_ERROR', message: 'AI output was not valid JSON. Try rephrasing.' });
+    }
   } catch (err) {
-    self.postMessage({ type: 'ERROR', message: err instanceof Error ? err.message : 'Analysis failed' });
+    self.postMessage({ type: 'ANALYSIS_ERROR', message: err instanceof Error ? err.message : 'Analysis failed' });
   }
 }
 

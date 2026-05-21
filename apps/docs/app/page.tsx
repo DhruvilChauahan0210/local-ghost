@@ -79,7 +79,7 @@ export default function HomePage() {
       <main>
         {/* ── HERO ── */}
         <section className="hero">
-          <div className="badge">v0.1.0 &mdash; MIT LICENSE &mdash; OPEN SOURCE</div>
+          <div className="badge">v1.0.0 &mdash; MIT LICENSE &mdash; OPEN SOURCE</div>
 
           <h1 className="headline">
             THE GRID<br />
@@ -99,7 +99,7 @@ export default function HomePage() {
               <span className="terminal-dot red" />
               <span className="terminal-dot yellow" />
               <span className="terminal-dot green" />
-              <span className="terminal-title">local-ghost — v0.1.0</span>
+              <span className="terminal-title">local-ghost — v1.0.0</span>
             </div>
             <div className="terminal-body">
               <div className="terminal-line">

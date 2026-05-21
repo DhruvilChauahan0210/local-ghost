@@ -102,7 +102,7 @@ export default function App() {
         </a>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
           <span style={{ fontFamily: 'var(--font)', fontSize: '0.65rem', color: 'var(--text-3)', letterSpacing: '0.1em' }}>
-            v0.1.0
+            v1.0.0
           </span>
           <a href="https://github.com" style={{
             fontFamily: 'var(--font)', fontSize: '0.7rem', color: 'var(--text-2)',
@@ -126,7 +126,7 @@ export default function App() {
             border: '1px solid #1a3a1a', padding: '0.25rem 0.65rem',
             marginBottom: '1.25rem', textTransform: 'uppercase',
           }}>
-            Phase 3 — 3 Components Active
+            v1.0.0 — 3 Components Active
           </div>
           <h1 style={{
             fontFamily: 'var(--font-display)',

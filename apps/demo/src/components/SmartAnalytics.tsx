@@ -5,7 +5,7 @@ import {
 } from 'recharts';
 import { useWebGPUAI } from '../hooks/useWebGPUAI';
 import type { AnalysisResult } from '../hooks/useWebGPUAI';
-import { AIStatusBadge } from './AIStatusBadge';
+import { AIStatusBadge, TerminalLogPanel } from './AIStatusBadge';
 
 export interface SmartAnalyticsProps {
   data: Record<string, unknown>[];
@@ -179,7 +179,7 @@ export function SmartAnalytics({ data, className = '' }: SmartAnalyticsProps) {
             </div>
             <span className="text-sm font-semibold text-slate-200">AI Analytics</span>
           </div>
-          <AIStatusBadge status={ai.status} progress={ai.progress} mode={ai.mode} error={ai.error} systemLogs={ai.systemLogs} />
+          <AIStatusBadge status={ai.status} progress={ai.progress} mode={ai.mode} error={ai.error} />
         </div>
 
         {(ai.status === 'uninitialized' || ai.status === 'disposed') && (
@@ -224,6 +224,8 @@ export function SmartAnalytics({ data, className = '' }: SmartAnalyticsProps) {
             </span>
           </div>
         )}
+
+        <TerminalLogPanel logs={ai.systemLogs} visible={ai.status === 'loading'} />
 
         {status === 'error' && error && (
           <div className="mt-3 flex items-start gap-2 rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2 text-xs text-red-300">

@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { useWebGPUAI } from '../hooks/useWebGPUAI';
-import { AIStatusBadge } from './AIStatusBadge';
+import { AIStatusBadge, TerminalLogPanel } from './AIStatusBadge';
 
 interface SmartDataGridProps {
   data: Record<string, unknown>[];
@@ -45,8 +45,12 @@ export function SmartDataGrid({ data }: SmartDataGridProps) {
       const { code, usedFallback: fb } = await ai.runQuery(schema, query.trim());
       setUsedFallback(fb);
 
-      const sandbox = new Function('data', `return (${code})(data)`);
-      const result = sandbox(data) as unknown;
+      // Hardened sandbox: shadow dangerous globals with null
+      const sandboxed = new Function(
+        'data', 'window', 'document', 'fetch', 'localStorage', 'sessionStorage',
+        `"use strict"; const fn = ${code}; return fn(data);`
+      );
+      const result = sandboxed(data, null, null, null, null, null) as unknown;
 
       if (!Array.isArray(result)) {
         throw new TypeError('AI returned code that did not produce an array');
@@ -55,7 +59,7 @@ export function SmartDataGrid({ data }: SmartDataGridProps) {
       setDisplayData(result as Record<string, unknown>[]);
       setQueryStatus('idle');
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Unknown error';
+      const msg = err instanceof Error ? err.message : String(err);
       setQueryError(msg);
       setQueryStatus('error');
     }
@@ -111,7 +115,6 @@ export function SmartDataGrid({ data }: SmartDataGridProps) {
             progress={ai.progress}
             error={ai.error}
             mode={ai.mode}
-            systemLogs={ai.systemLogs}
           />
         </div>
 
@@ -249,27 +252,7 @@ export function SmartDataGrid({ data }: SmartDataGridProps) {
           </div>
         )}
 
-        {ai.status === 'error' && ai.error && (
-          <div className="mt-3 flex items-start gap-2 rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-2.5 text-xs text-amber-300">
-            <svg
-              className="mt-0.5 h-3.5 w-3.5 shrink-0"
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-              aria-hidden="true"
-            >
-              <path
-                fillRule="evenodd"
-                d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z"
-                clipRule="evenodd"
-              />
-            </svg>
-            <span>
-              <strong className="font-semibold">WebGPU unavailable:</strong>{' '}
-              {ai.error}
-            </span>
-          </div>
-        )}
+        <TerminalLogPanel logs={ai.systemLogs} visible={ai.status === 'loading'} />
       </div>
 
       {/* Stats Bar */}

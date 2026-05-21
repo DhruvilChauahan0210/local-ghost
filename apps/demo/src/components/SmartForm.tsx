@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useWebGPUAI } from '../hooks/useWebGPUAI';
-import { AIStatusBadge } from './AIStatusBadge';
+import { AIStatusBadge, TerminalLogPanel } from './AIStatusBadge';
 
 export interface SmartFormField {
   name: string;
@@ -82,7 +82,7 @@ export function SmartForm({ fields, onSubmit, className = '' }: SmartFormProps) 
             </div>
             <span className="text-sm font-semibold text-slate-200">AI Smart Form</span>
           </div>
-          <AIStatusBadge status={ai.status} progress={ai.progress} error={ai.error} mode={ai.mode} systemLogs={ai.systemLogs} />
+          <AIStatusBadge status={ai.status} progress={ai.progress} error={ai.error} mode={ai.mode} />
         </div>
 
         {(ai.status === 'uninitialized' || ai.status === 'disposed') && (
@@ -111,7 +111,7 @@ export function SmartForm({ fields, onSubmit, className = '' }: SmartFormProps) 
           />
           <button
             onClick={() => void handleAutoFill()}
-            disabled={extractStatus === 'running' || !pastedText.trim()}
+            disabled={ai.status !== 'ready' || extractStatus === 'running' || !pastedText.trim()}
             className="flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md transition-all hover:bg-indigo-500 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {extractStatus === 'running' ? (
@@ -121,6 +121,8 @@ export function SmartForm({ fields, onSubmit, className = '' }: SmartFormProps) 
             )}
           </button>
         </div>
+
+        <TerminalLogPanel logs={ai.systemLogs} visible={ai.status === 'loading'} />
 
         {extractStatus === 'done' && (
           <div className="mt-3 flex items-center gap-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 text-xs text-emerald-300">
