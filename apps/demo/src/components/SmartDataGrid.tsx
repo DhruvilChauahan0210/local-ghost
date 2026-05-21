@@ -6,7 +6,7 @@ interface SmartDataGridProps {
   data: Record<string, unknown>[];
 }
 
-type QueryStatus = 'idle' | 'running' | 'error';
+type QueryStatus = 'idle' | 'running' | 'error' | 'stat';
 
 function CellValue({ value }: { value: unknown }) {
   if (value === null || value === undefined) {
@@ -29,6 +29,7 @@ export function SmartDataGrid({ data }: SmartDataGridProps) {
   const [queryStatus, setQueryStatus] = useState<QueryStatus>('idle');
   const [queryError, setQueryError] = useState<string | null>(null);
   const [usedFallback, setUsedFallback] = useState(false);
+  const [statResult, setStatResult] = useState<{ label: string; value: string } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const columns = data.length > 0 ? Object.keys(data[0]) : [];
@@ -38,6 +39,7 @@ export function SmartDataGrid({ data }: SmartDataGridProps) {
 
     setQueryStatus('running');
     setQueryError(null);
+    setStatResult(null);
 
     const schema = columns.join(', ');
 
@@ -52,12 +54,18 @@ export function SmartDataGrid({ data }: SmartDataGridProps) {
       );
       const result = sandboxed(data, null, null, null, null, null) as unknown;
 
-      if (!Array.isArray(result)) {
-        throw new TypeError('AI returned code that did not produce an array');
+      if (Array.isArray(result)) {
+        setDisplayData(result as Record<string, unknown>[]);
+        setQueryStatus('idle');
+      } else if (typeof result === 'number' || typeof result === 'string' || typeof result === 'boolean') {
+        // AI computed a scalar (count, average, etc.) — surface it as a stat card
+        const formatted = typeof result === 'number' ? result.toLocaleString() : String(result);
+        setStatResult({ label: query.trim(), value: formatted });
+        setDisplayData(data); // restore full table below the stat
+        setQueryStatus('stat');
+      } else {
+        throw new TypeError(`AI code returned ${typeof result} — expected an array. For aggregations try the Analytics tab.`);
       }
-
-      setDisplayData(result as Record<string, unknown>[]);
-      setQueryStatus('idle');
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setQueryError(msg);
@@ -71,6 +79,7 @@ export function SmartDataGrid({ data }: SmartDataGridProps) {
     setQueryStatus('idle');
     setQueryError(null);
     setUsedFallback(false);
+    setStatResult(null);
     inputRef.current?.focus();
   }, [data]);
 
@@ -83,7 +92,7 @@ export function SmartDataGrid({ data }: SmartDataGridProps) {
     [handleRunQuery]
   );
 
-  const isFiltered = displayData.length !== data.length;
+  const isFiltered = queryStatus !== 'stat' && displayData.length !== data.length;
 
   return (
     <div className="flex flex-col gap-4">
@@ -206,7 +215,7 @@ export function SmartDataGrid({ data }: SmartDataGridProps) {
               </>
             )}
           </button>
-          {(isFiltered || queryStatus === 'error') && (
+          {(isFiltered || queryStatus === 'error' || queryStatus === 'stat') && (
             <button
               onClick={handleReset}
               className="flex items-center gap-1.5 rounded-lg border border-slate-600 bg-slate-700/50 px-4 py-2.5 text-sm font-medium text-slate-300 transition-all hover:bg-slate-700 active:scale-95"
@@ -254,6 +263,20 @@ export function SmartDataGrid({ data }: SmartDataGridProps) {
 
         <TerminalLogPanel logs={ai.systemLogs} visible={ai.status === 'loading'} />
       </div>
+
+      {/* Stat card — when AI returned a scalar instead of rows */}
+      {queryStatus === 'stat' && statResult && (
+        <div className="rounded-xl border border-emerald-500/20 bg-[#1a1d27] px-6 py-5 shadow-xl flex items-center justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-1">{statResult.label}</p>
+            <p className="font-mono text-4xl font-bold text-emerald-400 tracking-tight">{statResult.value}</p>
+          </div>
+          <p className="text-xs text-slate-600 max-w-[200px] text-right leading-relaxed">
+            For charts, averages, and breakdowns use the{' '}
+            <span className="text-slate-400">Analytics</span> tab.
+          </p>
+        </div>
+      )}
 
       {/* Stats Bar */}
       <div className="flex items-center justify-between px-1">

@@ -169,8 +169,19 @@ function fixBrokenArrowFn(input: string, fields: string[]): string | null {
     if (sf) parts.push(`String(row['${sf}']).toLowerCase().includes('${value.toLowerCase()}')`);
   }
 
+  // "how many X" / "count X" → treat as a filter (array length tells the count)
+  const countM = q.match(/(?:how many|count(?:\s+of)?|number of)\s+([a-z][a-z\s]*?)(?:\s+are there)?(?:\s+in the data)?$/);
+  if (countM && !gtM && !ltM) {
+    const rawVal = countM[1].trim().replace(/s$/, '');
+    if (rawVal && rawVal.length > 2) {
+      const sf = fields.find(f => STRING_FIELDS.includes(f.toLowerCase()));
+      if (sf) parts.push(`String(row['${sf}']).toLowerCase().includes('${rawVal.toLowerCase()}')`);
+    }
+    // "how many employees / people / total" → return all rows
+  }
+
   // "show only X" / "only X" / "filter X" / "find X" / "list X" / bare noun
-  if (!gtM && !ltM && !eqM) {
+  if (!gtM && !ltM && !eqM && !countM) {
     const showM = q.match(/(?:show\s+only|only|filter|find|list|get|display)\s+([a-z][a-z\s]*)$/);
     const bareM = !showM ? q.match(/^([a-z][a-z\s]*)(?:\s+only)?$/) : null;
     const rawVal = ((showM ? showM[1] : null) ?? (bareM ? bareM[1] : null) ?? '').trim().replace(/s$/, '');
@@ -210,16 +221,21 @@ async function runQuery(schema: string, userInput: string): Promise<void> {
     const arrowMatch = raw.match(/\(data\)\s*=>.+/s);
     const code = arrowMatch ? arrowMatch[0].trim() : raw;
     try {
-      new Function('data', `return (${code})([])`);
+      // Validate: must not throw AND must return an array (not a number/string/etc.)
+      const testResult = (new Function('data', `return (${code})([])`))([] as Record<string, unknown>[]);
+      if (!Array.isArray(testResult)) {
+        throw new Error(`code returned ${typeof testResult}, expected array`);
+      }
       self.postMessage({ type: 'QUERY_RESULT', code, usedFallback: false });
     } catch {
-      const fixed = fixBrokenArrowFn(userInput, schema.split(',').map(s => s.trim()));
+      const fields = schema.split(',').map(s => s.trim());
+      const fixed = fixBrokenArrowFn(userInput, fields);
       if (fixed) {
         self.postMessage({ type: 'QUERY_RESULT', code: fixed, usedFallback: true });
       } else {
         self.postMessage({
           type: 'QUERY_ERROR',
-          message: `Could not parse "${userInput}". Try: "age > 30", "sort by salary desc", "show only engineers"`,
+          message: `Could not produce a data query for "${userInput}". For counts or averages, try the Analytics tab.`,
         });
       }
     }
