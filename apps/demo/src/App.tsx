@@ -1,4 +1,24 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+
+type Theme = 'dark' | 'light';
+
+function useTheme() {
+  const [theme, setTheme] = useState<Theme>('dark');
+  useEffect(() => {
+    const stored = localStorage.getItem('lg-theme') as Theme | null;
+    const preferred = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    const resolved = stored ?? preferred;
+    setTheme(resolved);
+    document.documentElement.setAttribute('data-theme', resolved);
+  }, []);
+  function toggle() {
+    const next: Theme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('lg-theme', next);
+  }
+  return { theme, toggle };
+}
 import { SmartDataGrid } from './components/SmartDataGrid';
 import { SmartForm }     from './components/SmartForm';
 import { SmartAnalytics } from './components/SmartAnalytics';
@@ -72,6 +92,7 @@ const TABS: { id: Tab; label: string; num: string; desc: string; examples: strin
 export default function App() {
   const [active, setActive] = useState<Tab>('grid');
   const [submitted, setSubmitted] = useState<Record<string, string> | null>(null);
+  const { theme, toggle } = useTheme();
 
   const tab = TABS.find(t => t.id === active)!;
 
@@ -79,38 +100,20 @@ export default function App() {
     <div className="relative z-10 min-h-screen" style={{ fontFamily: 'var(--font)' }}>
 
       {/* ── NAV ── */}
-      <nav style={{
-        position: 'sticky', top: 0, zIndex: 100,
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 2rem', height: '52px',
-        background: 'rgba(2,4,2,0.95)',
-        backdropFilter: 'blur(8px)',
-        borderBottom: '1px solid var(--border)',
-      }}>
-        <a href="http://localhost:3000" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <span style={{
-            fontFamily: 'var(--font-display)',
-            fontSize: '1.3rem', letterSpacing: '0.08em',
-            color: 'var(--green)',
-            textShadow: '0 0 12px rgba(0,255,65,0.4)',
-          }}>
-            LOCAL GHOST
-          </span>
-          <span style={{ fontSize: '0.6rem', color: 'var(--text-3)', letterSpacing: '0.12em', textTransform: 'uppercase', borderLeft: '1px solid var(--border)', paddingLeft: '0.75rem' }}>
-            Live Demo
-          </span>
+      <nav className="demo-nav">
+        <a href="http://localhost:3000" className="demo-nav-logo">
+          LOCAL GHOST<span style={{ animation: 'blink 1s step-end infinite' }}>_</span>
+          <span className="demo-nav-sep">Live Demo</span>
         </a>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <span style={{ fontFamily: 'var(--font)', fontSize: '0.65rem', color: 'var(--text-3)', letterSpacing: '0.1em' }}>
-            v1.0.0
-          </span>
-          <a href="https://github.com" style={{
-            fontFamily: 'var(--font)', fontSize: '0.7rem', color: 'var(--text-2)',
-            textDecoration: 'none', letterSpacing: '0.08em',
-            border: '1px solid var(--border)', padding: '0.3rem 0.65rem',
-          }}>
-            [ GITHUB ]
+          <span className="demo-nav-badge">v1.2.0</span>
+          <a href="https://github.com/DhruvilChauahan0210/local-ghost" target="_blank" rel="noreferrer" className="demo-nav-link">
+            [ GitHub ]
           </a>
+          <button onClick={toggle} className="demo-nav-toggle">
+            <span style={{ fontSize: '0.8rem' }}>{theme === 'dark' ? '◑' : '◐'}</span>
+            {theme === 'dark' ? 'LIGHT' : 'DARK'}
+          </button>
         </div>
       </nav>
 
@@ -126,7 +129,7 @@ export default function App() {
             border: '1px solid #1a3a1a', padding: '0.25rem 0.65rem',
             marginBottom: '1.25rem', textTransform: 'uppercase',
           }}>
-            v1.0.0 — 3 Components Active
+            v1.2.0 — 3 Components Active
           </div>
           <h1 style={{
             fontFamily: 'var(--font-display)',

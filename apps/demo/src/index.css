@@ -7,31 +7,118 @@
 
   :root {
     /* ── Brand ── */
-    --green:          #00ff41;   /* 18.5:1 on --ink ✓ AAA */
-    --green-dim:      #00cc33;   /* 12:1   on --ink ✓ AAA */
-    --green-glow:     rgba(0,255,65,0.15);
-    --orange:         #ff6b35;
-    --yellow:         #f5e642;
+    --green:      #00ff41;
+    --green-dim:  #00cc33;
+    --green-glow: rgba(0,255,65,0.25);
+    --orange:     #ff6b35;
+    --yellow:     #f5e642;
 
     /* ── Backgrounds ── */
-    --ink:            #020402;   /* page background */
-    --surface:        #0d150d;   /* cards / panels  — lifted for visibility */
-    --surface-2:      #131c13;   /* inputs, nested surfaces */
-    --surface-3:      #192419;   /* hover / active states */
+    --ink:        #020402;
+    --surface:    #0d150d;
+    --surface-2:  #131c13;
+    --surface-3:  #192419;
 
     /* ── Borders ── */
-    --border:         #243224;   /* 1px rule lines */
-    --border-2:       #2e422e;   /* focused / highlighted borders */
+    --border:     #1a2a1a;
+    --border-2:   #243224;
 
-    /* ── Text tiers (all verified ≥ 4.5:1 on --ink) ── */
-    --text:           #e2f0e2;   /* 17:1  — primary text, headings */
-    --text-2:         #a8c8a8;   /* 9.5:1 — secondary text, descriptions */
-    --text-3:         #6e9a6e;   /* 5.2:1 — captions, labels, axis text */
-    --text-4:         #4a6e4a;   /* 3.1:1 — decorative-only, non-text uses */
+    /* ── Text ── */
+    --text:       #e2f0e2;
+    --text-2:     #a8c8a8;
+    --text-3:     #6e9a6e;
+    --text-4:     #4a6e4a;
 
     /* ── Fonts ── */
     --font:         'JetBrains Mono', monospace;
     --font-display: 'Bebas Neue', monospace;
+  }
+
+  [data-theme="light"] {
+    --green:      #0a5c1e;
+    --green-dim:  #084817;
+    --green-glow: rgba(10,92,30,0.20);
+    --orange:     #b83c18;
+    --yellow:     #7a6200;
+    --ink:        #ece7dc;
+    --surface:    #e3ddd1;
+    --surface-2:  #d8d2c4;
+    --surface-3:  #cec8b8;
+    --border:     #b8b0a0;
+    --border-2:   #a8a090;
+    --text:       #12100a;
+    --text-2:     #3e3828;
+    --text-3:     #6a5e4e;
+    --text-4:     #9a8e7e;
+  }
+
+  /* Nav — theme-aware, matches docs site */
+  .demo-nav {
+    position: sticky; top: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 2.5rem; height: 52px;
+    background: rgba(2,4,2,0.92);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+  }
+  [data-theme="light"] .demo-nav {
+    background: rgba(236,231,220,0.92);
+  }
+
+  .demo-nav-logo {
+    font-family: var(--font-display);
+    font-size: 1.4rem; letter-spacing: 0.1em;
+    color: var(--green);
+    text-shadow: 0 0 12px var(--green-glow);
+    text-decoration: none;
+    display: flex; align-items: center; gap: 0.75rem;
+  }
+  .demo-nav-sep {
+    font-size: 0.6rem; color: var(--text-3);
+    letter-spacing: 0.12em; text-transform: uppercase;
+    border-left: 1px solid var(--border); padding-left: 0.75rem;
+    font-family: var(--font);
+  }
+  .demo-nav-link {
+    font-family: var(--font);
+    font-size: 0.72rem; font-weight: 600; letter-spacing: 0.08em;
+    color: var(--text-3); text-decoration: none;
+    padding: 0.3rem 0.6rem;
+    border: 1px solid transparent;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .demo-nav-link:hover { color: var(--text); border-color: var(--border); }
+  .demo-nav-badge {
+    font-family: var(--font);
+    font-size: 0.65rem; font-weight: 700; letter-spacing: 0.1em;
+    color: var(--text-3); border: 1px solid var(--border);
+    padding: 0.25rem 0.6rem;
+  }
+  .demo-nav-toggle {
+    font-family: var(--font);
+    font-size: 0.65rem; font-weight: 700; letter-spacing: 0.1em;
+    color: var(--text-3); background: transparent;
+    border: 1px solid var(--border); padding: 0.28rem 0.65rem;
+    cursor: pointer; display: flex; align-items: center; gap: 0.35rem;
+    transition: color 0.15s, border-color 0.15s, box-shadow 0.15s;
+  }
+  .demo-nav-toggle:hover {
+    color: var(--green); border-color: var(--green);
+    box-shadow: 0 0 8px var(--green-glow);
+  }
+
+  [data-theme="light"] .demo-nav-logo { text-shadow: 0 0 8px var(--green-glow); }
+
+  [data-theme="light"] body::before {
+    background-image: radial-gradient(circle, #b8b0a0 1px, transparent 1px);
+  }
+
+  [data-theme="light"] body::after {
+    background: repeating-linear-gradient(
+      to bottom,
+      transparent 0px, transparent 3px,
+      rgba(0,0,0,0.025) 3px, rgba(0,0,0,0.025) 4px
+    );
   }
 
   html {
