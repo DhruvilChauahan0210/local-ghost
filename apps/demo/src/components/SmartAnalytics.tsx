@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
+  ScatterChart, Scatter,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
 import { useWebGPUAI } from '../hooks/useWebGPUAI';
@@ -38,8 +39,19 @@ function executeAnalysis(
   }
 
   if (result.action === 'chart') {
-    const { xKey, yKey: rawYKey, aggregation = 'count' } = result;
+    const { xKey, yKey: rawYKey, aggregation = 'count', type } = result;
     if (!xKey) return null;
+
+    // Scatter: raw data points, no aggregation
+    if (type === 'scatter') {
+      const yKey = rawYKey ?? '';
+      if (!yKey) return null;
+      const chartData = data.map(row => ({
+        [xKey]: Number(row[xKey] ?? 0),
+        [yKey]: Number(row[yKey] ?? 0),
+      }));
+      return { chartData, yKey };
+    }
 
     const groups: Record<string, number[]> = {};
     for (const row of data) {
@@ -101,6 +113,42 @@ function renderChart(result: AnalysisResult, chartData: Record<string, unknown>[
       </LineChart>
     </ResponsiveContainer>
   );
+
+  if (result.type === 'scatter') {
+    const xK = result.xKey ?? '';
+    return (
+      <ResponsiveContainer width="100%" height={300}>
+        <ScatterChart margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+          <XAxis
+            dataKey={xK}
+            name={xK}
+            type="number"
+            tick={{ fill: '#94a3b8', fontSize: 11 }}
+            axisLine={{ stroke: '#475569' }}
+            tickLine={false}
+            label={{ value: xK, position: 'insideBottom', offset: -2, fill: '#64748b', fontSize: 10 }}
+          />
+          <YAxis
+            dataKey={yKey}
+            name={yKey}
+            type="number"
+            tick={{ fill: '#94a3b8', fontSize: 11 }}
+            axisLine={false}
+            tickLine={false}
+            tickFormatter={fmt}
+            label={{ value: yKey, angle: -90, position: 'insideLeft', fill: '#64748b', fontSize: 10 }}
+          />
+          <Tooltip
+            contentStyle={ts}
+            cursor={{ strokeDasharray: '3 3', stroke: '#475569' }}
+            formatter={(v: number, name: string) => [v.toLocaleString(), name]}
+          />
+          <Scatter data={chartData} fill="#818cf8" opacity={0.75} />
+        </ScatterChart>
+      </ResponsiveContainer>
+    );
+  }
 
   if (result.type === 'pie') return (
     <ResponsiveContainer width="100%" height={300}>
@@ -220,7 +268,11 @@ export function SmartAnalytics({ data, className = '' }: SmartAnalyticsProps) {
         {status === 'done' && aiDecision && (
           <div className="mt-3 flex items-center gap-2 text-xs text-slate-500">
             <span className="rounded border border-slate-600 px-2 py-0.5 font-mono">
-              AI decided: {aiDecision.action === 'chart' ? `${aiDecision.type} chart · ${aiDecision.aggregation} of ${aiDecision.yKey} by ${aiDecision.xKey}` : `filter · ${aiDecision.field} ${aiDecision.op} ${aiDecision.value}`}
+              AI decided: {aiDecision.action === 'chart'
+            ? aiDecision.type === 'scatter'
+              ? `scatter · ${aiDecision.xKey} vs ${aiDecision.yKey}`
+              : `${aiDecision.type} chart · ${aiDecision.aggregation} of ${aiDecision.yKey} by ${aiDecision.xKey}`
+            : `filter · ${aiDecision.field} ${aiDecision.op} ${aiDecision.value}`}
             </span>
           </div>
         )}
@@ -288,7 +340,7 @@ export function SmartAnalytics({ data, className = '' }: SmartAnalyticsProps) {
         <div className="mt-4 flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-700/40 bg-[#1a1d27]/50 p-8 text-center">
           <svg className="mb-3 h-10 w-10 text-slate-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/></svg>
           <p className="text-sm text-slate-500">AI will decide whether to show a chart or a filtered table</p>
-          <p className="mt-1 text-xs text-slate-600">"average salary by role" · "employees with salary more than 100000" · "count by city"</p>
+          <p className="mt-1 text-xs text-slate-600">"average salary by role" · "scatter age vs salary" · "count by city" · "show engineers"</p>
         </div>
       )}
 

@@ -256,19 +256,23 @@ async function extractJSON(schema: string, userInput: string): Promise<void> {
 // ── SmartAnalytics ────────────────────────────────────────────────────────────
 const ANALYZE_PROMPT = `You are a data analysis AI. Dataset columns: {SCHEMA}
 
-Decide if the user wants a CHART (aggregate/visualize) or a FILTER (list matching rows), then output ONLY valid JSON.
+Decide if the user wants a CHART (aggregate/visualize), SCATTER (plot two numeric fields), or a FILTER (list matching rows), then output ONLY valid JSON.
 
 CHART examples: "average salary by role", "count by city", "salary distribution pie"
+SCATTER examples: "scatter age vs salary", "plot salary against age", "make scatter chart", "age salary scatter"
 FILTER examples: "employees with salary more than 100000", "show engineers", "list people older than 35"
 
 For CHART output exactly this shape:
 {"action":"chart","type":"bar","xKey":"role","yKey":"salary","aggregation":"avg","title":"Average Salary by Role"}
 
+For SCATTER output exactly this shape:
+{"action":"chart","type":"scatter","xKey":"age","yKey":"salary","title":"Age vs Salary"}
+
 For FILTER output exactly this shape:
 {"action":"filter","field":"salary","op":">","value":100000,"title":"Employees with salary over 100k"}
 
-Valid type values: bar, line, pie
-Valid aggregation values: count, avg, sum, max, min
+Valid type values: bar, line, pie, scatter
+Valid aggregation values: count, avg, sum, max, min (not used for scatter)
 Valid op values: >, <, =, contains
 
 Output ONLY the JSON object. No other text.`;
@@ -289,8 +293,13 @@ async function analyzeData(schema: string, userInput: string): Promise<void> {
     }
     try {
       const result = JSON.parse(jsonMatch[0]) as Record<string, unknown>;
+      // Normalize: model sometimes omits "action" when type is obvious
+      const CHART_TYPES = ['bar', 'line', 'pie', 'scatter'];
+      if (!result['action'] && CHART_TYPES.includes(String(result['type']))) {
+        result['action'] = 'chart';
+      }
       if (result['action'] !== 'chart' && result['action'] !== 'filter') {
-        self.postMessage({ type: 'ANALYSIS_ERROR', message: 'AI returned unrecognized action. Try rephrasing.' });
+        self.postMessage({ type: 'ANALYSIS_ERROR', message: 'AI returned an unrecognized response. Try: "average salary by role", "scatter age vs salary", or "show engineers".' });
         return;
       }
       self.postMessage({ type: 'ANALYSIS_RESULT', result });

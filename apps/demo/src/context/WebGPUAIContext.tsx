@@ -13,7 +13,7 @@ export interface AIState {
 
 export interface AnalysisResult {
   action: 'chart' | 'filter';
-  type?: 'bar' | 'line' | 'pie';
+  type?: 'bar' | 'line' | 'pie' | 'scatter';
   xKey?: string;
   yKey?: string;
   aggregation?: 'count' | 'avg' | 'sum' | 'max' | 'min';
