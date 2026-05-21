@@ -468,6 +468,105 @@ main { position: relative; z-index: 1; }
 .c-yellow { color: var(--yellow); }
 .c-muted  { color: var(--muted); }
 
+/* ─── CURSOR SPOTLIGHT ─── */
+.cursor-spotlight {
+  position: fixed;
+  top: 0; left: 0;
+  width: 600px; height: 600px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(0,255,65,0.055) 0%, rgba(0,255,65,0.018) 35%, transparent 70%);
+  pointer-events: none;
+  z-index: 2;
+  will-change: transform;
+  mix-blend-mode: screen;
+}
+[data-theme="light"] .cursor-spotlight {
+  background: radial-gradient(circle, rgba(10,92,30,0.06) 0%, rgba(10,92,30,0.02) 35%, transparent 70%);
+  mix-blend-mode: multiply;
+}
+
+/* ─── EMP CLICK PULSE ─── */
+.emp-ring {
+  position: fixed;
+  width: 8px; height: 8px;
+  margin: -4px 0 0 -4px;
+  border-radius: 50%;
+  border: 1.5px solid var(--green);
+  box-shadow: 0 0 6px var(--green);
+  pointer-events: none;
+  z-index: 9999;
+  animation: emp-expand 0.7s cubic-bezier(0.2, 0.8, 0.4, 1) forwards;
+  will-change: transform, opacity;
+}
+
+@keyframes emp-expand {
+  0%   { transform: scale(1);  opacity: 0.9; }
+  60%  { opacity: 0.4; }
+  100% { transform: scale(18); opacity: 0; }
+}
+
+/* ─── HERO ACCENT GLITCH ─── */
+.headline-accent {
+  color: var(--green);
+  text-shadow: 0 0 30px var(--green-glow), 0 0 60px #00ff4120;
+  animation: hero-glitch 9s step-end infinite;
+}
+
+@keyframes hero-glitch {
+  0%, 82%, 100% {
+    transform: none;
+    text-shadow: 0 0 30px var(--green-glow), 0 0 60px #00ff4120;
+    clip-path: none;
+  }
+  83% {
+    transform: translate(-3px, 1px) skewX(-3deg);
+    text-shadow: -3px 0 var(--orange), 3px 0 var(--green);
+  }
+  84% {
+    transform: translate(3px, -1px) skewX(3deg);
+    text-shadow: 3px 0 var(--orange), -3px 0 var(--green);
+    clip-path: inset(10% 0 40% 0);
+  }
+  85% {
+    transform: translate(-2px, 0);
+    text-shadow: 0 0 30px var(--green-glow);
+    clip-path: none;
+  }
+  86% {
+    transform: translate(4px, 1px) skewX(-2deg);
+    text-shadow: -4px 0 rgba(255,107,53,0.7), 4px 0 var(--green);
+    clip-path: inset(60% 0 10% 0);
+  }
+  87% {
+    transform: none;
+    text-shadow: 0 0 30px var(--green-glow), 0 0 60px #00ff4120;
+    clip-path: none;
+  }
+}
+
+/* ─── FEATURE CARD SCAN SWEEP ─── */
+.feature-card::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, var(--green) 30%, var(--green) 70%, transparent 100%);
+  box-shadow: 0 0 10px var(--green), 0 0 20px rgba(0,255,65,0.3);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(0);
+}
+.feature-card:hover::after {
+  animation: card-scan 0.75s ease-in-out forwards;
+  animation-delay: 0.05s;
+}
+
+@keyframes card-scan {
+  0%   { opacity: 1;   transform: translateY(0); }
+  85%  { opacity: 0.5; }
+  100% { opacity: 0;   transform: translateY(260px); }
+}
+
 /* ─── LIVE PROJECT STATS ─── */
 .live-stats-section {
   max-width: 960px;
@@ -619,4 +718,47 @@ footer {
   .live-stat:nth-child(4),
   .live-stat:nth-child(5),
   .live-stat:nth-child(6) { border-top: 1px solid var(--border); }
+}
+
+/* ─── HAMBURGER ─── */
+.nav-hamburger {
+  display: none;
+  font-family: var(--font-mono);
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em;
+  color: var(--muted); background: transparent;
+  border: 1px solid transparent; padding: 0.3rem 0.4rem;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.nav-hamburger:hover { color: var(--green); border-color: var(--border); }
+
+/* ─── MOBILE MENU DROPDOWN ─── */
+.nav-mobile-menu {
+  position: sticky; top: 52px; z-index: 99;
+  display: flex; flex-direction: column;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  padding: 0.5rem 1.25rem;
+}
+.nav-mobile-link {
+  font-size: 0.78rem; font-weight: 600; letter-spacing: 0.08em;
+  color: var(--muted); text-decoration: none;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--border);
+  transition: color 0.15s;
+}
+.nav-mobile-link:last-child { border-bottom: none; }
+.nav-mobile-link:hover { color: var(--text); }
+.nav-mobile-link.accent { color: var(--green); }
+
+@media (max-width: 640px) {
+  .nav-links .nav-link { display: none; }
+  .nav-links .nav-link.accent { display: none; }
+  .nav-links .theme-toggle { display: flex; }
+  .nav-hamburger { display: flex; }
+  .nav-logo { font-size: 1.1rem; }
+}
+
+@media (max-width: 400px) {
+  .nav-logo { font-size: 1rem; letter-spacing: 0.06em; }
 }

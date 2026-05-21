@@ -1,10 +1,38 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --app-bg:       #020402;
+  --app-surface:  #0e140e;
+  --app-border:   #1a2a1a;
+  --app-text:     #d4e8d4;
+  --app-muted:    #3a5a3a;
+  --app-green:    #00ff41;
+  --app-green-dim:#00cc33;
+  --app-glow:     #00ff4140;
+  --app-orange:   #ff6b35;
+  --app-yellow:   #f5e642;
+}
+
+[data-theme="light"] {
+  --app-bg:       #ece7dc;
+  --app-surface:  #e3ddd1;
+  --app-border:   #b8b0a0;
+  --app-text:     #12100a;
+  --app-muted:    #6a5e4e;
+  --app-green:    #0a5c1e;
+  --app-green-dim:#084817;
+  --app-glow:     #0a5c1e28;
+  --app-orange:   #b83c18;
+  --app-yellow:   #7a6200;
+}
+
 @layer base {
   html {
-    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
   }
 
   ::-webkit-scrollbar {

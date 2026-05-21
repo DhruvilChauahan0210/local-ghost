@@ -93,6 +93,7 @@ export default function App() {
   const [active, setActive] = useState<Tab>('grid');
   const [submitted, setSubmitted] = useState<Record<string, string> | null>(null);
   const { theme, toggle } = useTheme();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const tab = TABS.find(t => t.id === active)!;
 
@@ -114,114 +115,67 @@ export default function App() {
             <span style={{ fontSize: '0.8rem' }}>{theme === 'dark' ? '◑' : '◐'}</span>
             {theme === 'dark' ? 'LIGHT' : 'DARK'}
           </button>
+          <button className="demo-nav-hamburger" onClick={() => setMenuOpen(o => !o)} aria-label="Menu">
+            {menuOpen ? '[ ✕ ]' : '[ ≡ ]'}
+          </button>
         </div>
       </nav>
 
+      {menuOpen && (
+        <div className="demo-mobile-menu" onClick={() => setMenuOpen(false)}>
+          <span className="demo-mobile-badge">v1.2.0</span>
+          <a href="https://github.com/DhruvilChauahan0210/local-ghost" target="_blank" rel="noreferrer" className="demo-mobile-link">
+            [ GitHub ]
+          </a>
+          <a href="http://localhost:3000" className="demo-mobile-link accent">
+            [ Docs ]
+          </a>
+        </div>
+      )}
+
       {/* ── MAIN ── */}
-      <main style={{ maxWidth: '960px', margin: '0 auto', padding: '3rem 2rem 6rem' }}>
+      <main className="demo-main">
 
         {/* ── HEADER ── */}
-        <div style={{ marginBottom: '3rem' }}>
-          <div style={{
-            display: 'inline-block',
-            fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.16em',
-            color: 'var(--green-dim)',
-            border: '1px solid #1a3a1a', padding: '0.25rem 0.65rem',
-            marginBottom: '1.25rem', textTransform: 'uppercase',
-          }}>
-            v1.2.0 — 3 Components Active
-          </div>
-          <h1 style={{
-            fontFamily: 'var(--font-display)',
-            fontSize: 'clamp(3.5rem, 10vw, 7rem)',
-            lineHeight: 0.9, letterSpacing: '0.02em',
-            color: 'var(--text)', marginBottom: '1rem',
-          }}>
+        <div className="demo-header">
+          <div className="demo-header-badge">v1.2.0 — 3 Components Active</div>
+          <h1 className="demo-header-h1">
             LOCAL<br />
-            <span style={{
-              color: 'var(--green)',
-              textShadow: '0 0 30px rgba(0,255,65,0.25)',
-            }}>GHOST.</span>
+            <span style={{ color: 'var(--green)', textShadow: '0 0 30px rgba(0,255,65,0.25)' }}>GHOST.</span>
           </h1>
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-2)', lineHeight: 1.9, maxWidth: '480px' }}>
+          <p className="demo-header-sub">
             Three components. Zero servers. Runs entirely on your GPU.<br />
             Switch tabs to test each one live.
           </p>
         </div>
 
-        {/* ── TAB NAVIGATION ── */}
-        <div style={{
-          display: 'flex', gap: '0',
-          borderTop: '1px solid var(--border)',
-          borderLeft: '1px solid var(--border)',
-          marginBottom: '0',
-        }}>
-          {TABS.map(t => {
-            const isActive = active === t.id;
-            return (
-              <button
-                key={t.id}
-                onClick={() => { setActive(t.id); setSubmitted(null); }}
-                style={{
-                  flex: 1,
-                  padding: '0.85rem 1rem',
-                  background: isActive ? 'rgba(0,255,65,0.07)' : 'transparent',
-                  border: 'none',
-                  borderRight: '1px solid var(--border)',
-                  borderBottom: isActive ? '2px solid var(--green)' : '1px solid var(--border)',
-                  cursor: 'pointer',
-                  fontFamily: 'var(--font)',
-                  textAlign: 'left',
-                  transition: 'all 0.15s',
-                }}
-              >
-                <div style={{ fontSize: '0.6rem', color: isActive ? 'var(--green-dim)' : 'var(--text-3)', letterSpacing: '0.14em', marginBottom: '0.2rem' }}>
-                  {t.num}
-                </div>
-                <div style={{
-                  fontFamily: 'var(--font-display)',
-                  fontSize: '1.05rem', letterSpacing: '0.06em',
-                  color: isActive ? 'var(--green)' : 'var(--text-2)',
-                  textShadow: isActive ? '0 0 10px rgba(0,255,65,0.3)' : 'none',
-                }}>
-                  {t.label}
-                </div>
-              </button>
-            );
-          })}
+        {/* ── TABS ── */}
+        <div className="demo-tabs">
+          {TABS.map(t => (
+            <button
+              key={t.id}
+              className={`demo-tab${active === t.id ? ' active' : ''}`}
+              onClick={() => { setActive(t.id); setSubmitted(null); }}
+            >
+              <div className="demo-tab-num">{t.num}</div>
+              <div className="demo-tab-label">{t.label}</div>
+            </button>
+          ))}
         </div>
 
-        {/* ── TAB CONTENT ── */}
-        <div style={{
-          border: '1px solid var(--border)',
-          borderTop: 'none',
-          background: 'var(--surface)',
-        }}>
-          {/* Content header */}
-          <div style={{
-            padding: '1rem 1.5rem',
-            borderBottom: '1px solid var(--border)',
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem',
-          }}>
-            <p style={{ fontSize: '0.72rem', color: 'var(--text-2)', letterSpacing: '0.04em' }}>
-              {tab.desc}
-            </p>
-            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+        {/* ── PANEL ── */}
+        <div className="demo-panel">
+          <div className="demo-panel-header">
+            <p className="demo-panel-desc">{tab.desc}</p>
+            <div className="demo-panel-chips">
               {tab.examples.slice(0, 3).map(ex => (
-                <span key={ex} style={{
-                  fontSize: '0.6rem', fontFamily: 'var(--font)',
-                  color: 'var(--text-3)', letterSpacing: '0.04em',
-                  border: '1px solid var(--border)',
-                  padding: '0.2rem 0.5rem', background: 'var(--surface-2)',
-                }}>
+                <span key={ex} className="demo-panel-chip">
                   ❯ {ex.length > 36 ? ex.slice(0, 36) + '…' : ex}
                 </span>
               ))}
             </div>
           </div>
-
-          {/* Component */}
-          <div className="terminal-wrap" style={{ padding: '1.5rem' }}>
+          <div className="terminal-wrap demo-panel-body">
             {active === 'grid' && (
               <SmartDataGrid data={SAMPLE_USERS as unknown as Record<string, unknown>[]} />
             )}
@@ -229,10 +183,8 @@ export default function App() {
               <div>
                 <SmartForm fields={FORM_FIELDS} onSubmit={vals => setSubmitted(vals)} />
                 {submitted && (
-                  <div style={{ marginTop: '1rem', border: '1px solid #1a3a1a', background: 'rgba(0,255,65,0.04)', padding: '1rem' }}>
-                    <div style={{ fontSize: '0.6rem', color: 'var(--green-dim)', letterSpacing: '0.14em', marginBottom: '0.75rem' }}>
-                      ✓ FORM SUBMITTED
-                    </div>
+                  <div style={{ marginTop: '1rem', border: '1px solid var(--border)', background: 'rgba(0,255,65,0.04)', padding: '1rem' }}>
+                    <div style={{ fontSize: '0.6rem', color: 'var(--green-dim)', letterSpacing: '0.14em', marginBottom: '0.75rem' }}>✓ FORM SUBMITTED</div>
                     <pre style={{ fontSize: '0.75rem', color: 'var(--green-dim)', fontFamily: 'var(--font)', lineHeight: 1.7, overflow: 'auto' }}>
                       {JSON.stringify(submitted, null, 2)}
                     </pre>
@@ -247,38 +199,23 @@ export default function App() {
         </div>
 
         {/* ── DIVIDER ── */}
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: '1rem',
-          margin: '3rem 0 2rem',
-          fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.16em',
-          color: 'var(--text-3)',
-        }}>
-          <span style={{ flex: 1, height: '1px', background: 'var(--border)' }} />
+        <div className="demo-divider">
+          <span className="demo-divider-line" />
           <span>// STACK</span>
-          <span style={{ flex: 1, height: '1px', background: 'var(--border)' }} />
+          <span className="demo-divider-line" />
         </div>
 
-        {/* ── STAT ROW ── */}
-        <div style={{ display: 'flex', borderTop: '1px solid var(--border)', borderLeft: '1px solid var(--border)' }}>
+        {/* ── STATS ── */}
+        <div className="demo-stats">
           {[
             { v: '0ms',  l: 'Server Latency' },
             { v: '$0',   l: 'Infra Cost' },
             { v: '100%', l: 'On-Device' },
             { v: '3',    l: 'Components' },
           ].map(({ v, l }) => (
-            <div key={l} style={{
-              flex: 1, padding: '1.25rem 1.5rem',
-              borderRight: '1px solid var(--border)',
-              borderBottom: '1px solid var(--border)',
-            }}>
-              <div style={{
-                fontFamily: 'var(--font-display)',
-                fontSize: '2.2rem', letterSpacing: '0.04em',
-                color: 'var(--green)',
-                textShadow: '0 0 20px rgba(0,255,65,0.2)',
-                lineHeight: 1, marginBottom: '0.25rem',
-              }}>{v}</div>
-              <div style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.12em', color: 'var(--text-3)', textTransform: 'uppercase' }}>{l}</div>
+            <div key={l} className="demo-stat">
+              <div className="demo-stat-value">{v}</div>
+              <div className="demo-stat-label">{l}</div>
             </div>
           ))}
         </div>
@@ -286,20 +223,9 @@ export default function App() {
       </main>
 
       {/* ── FOOTER ── */}
-      <footer style={{
-        borderTop: '1px solid var(--border)',
-        padding: '1.5rem 2rem',
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        flexWrap: 'wrap', gap: '0.5rem',
-        fontSize: '0.65rem', color: 'var(--text-3)', letterSpacing: '0.06em',
-      }}>
-        <span style={{ fontFamily: 'var(--font-display)', fontSize: '0.9rem', letterSpacing: '0.1em', color: '#1a3a1a' }}>
-          LOCAL GHOST_
-        </span>
-        <span>
-          @huggingface/transformers · WebGPU → WASM → Server ·{' '}
-          <span style={{ color: 'var(--green-dim)' }}>0 servers harmed</span>
-        </span>
+      <footer className="demo-footer">
+        <span className="demo-footer-logo">LOCAL GHOST_</span>
+        <span>@huggingface/transformers · WebGPU → WASM · <span style={{ color: 'var(--green-dim)' }}>0 servers harmed</span></span>
       </footer>
     </div>
   );

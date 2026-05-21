@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { SmartDataGrid } from './components/SmartDataGrid';
 
 interface UserRecord {
@@ -10,73 +11,168 @@ interface UserRecord {
 }
 
 const SAMPLE_USERS: UserRecord[] = [
-  { id: 1, name: 'Alice Mercer', age: 34, city: 'San Francisco', role: 'Engineer', salary: 145000 },
-  { id: 2, name: 'Bob Tanaka', age: 27, city: 'New York', role: 'Designer', salary: 98000 },
-  { id: 3, name: 'Carol Vance', age: 41, city: 'Austin', role: 'Manager', salary: 172000 },
-  { id: 4, name: 'David Osei', age: 29, city: 'Seattle', role: 'Engineer', salary: 138000 },
-  { id: 5, name: 'Eva Rossi', age: 36, city: 'Chicago', role: 'Analyst', salary: 115000 },
-  { id: 6, name: 'Frank Liu', age: 23, city: 'Los Angeles', role: 'Intern', salary: 52000 },
-  { id: 7, name: 'Grace Kim', age: 45, city: 'Boston', role: 'Director', salary: 210000 },
-  { id: 8, name: 'Henry Park', age: 31, city: 'Denver', role: 'Engineer', salary: 129000 },
-  { id: 9, name: 'Isla Nguyen', age: 38, city: 'Miami', role: 'Designer', salary: 107000 },
-  { id: 10, name: 'James Carter', age: 52, city: 'Atlanta', role: 'VP', salary: 285000 },
-  { id: 11, name: 'Kayla Brown', age: 26, city: 'Portland', role: 'Analyst', salary: 91000 },
-  { id: 12, name: 'Liam Patel', age: 33, city: 'San Diego', role: 'Engineer', salary: 142000 },
-  { id: 13, name: 'Mia Torres', age: 40, city: 'Phoenix', role: 'Manager', salary: 165000 },
-  { id: 14, name: 'Noah Gonzalez', age: 22, city: 'San Jose', role: 'Intern', salary: 48000 },
-  { id: 15, name: 'Olivia Chen', age: 37, city: 'San Francisco', role: 'Architect', salary: 198000 },
-  { id: 16, name: 'Pedro Silva', age: 44, city: 'Houston', role: 'Director', salary: 225000 },
-  { id: 17, name: 'Quinn Walker', age: 28, city: 'New York', role: 'Engineer', salary: 133000 },
-  { id: 18, name: 'Rachel Adams', age: 35, city: 'Austin', role: 'Designer', salary: 112000 },
-  { id: 19, name: 'Sam Wilson', age: 49, city: 'Chicago', role: 'VP', salary: 260000 },
-  { id: 20, name: 'Tina Zhang', age: 30, city: 'Seattle', role: 'Analyst', salary: 104000 },
+  { id: 1,  name: 'Alice Mercer',   age: 34, city: 'San Francisco', role: 'Engineer',   salary: 145000 },
+  { id: 2,  name: 'Bob Tanaka',     age: 27, city: 'New York',       role: 'Designer',   salary: 98000  },
+  { id: 3,  name: 'Carol Vance',    age: 41, city: 'Austin',         role: 'Manager',    salary: 172000 },
+  { id: 4,  name: 'David Osei',     age: 29, city: 'Seattle',        role: 'Engineer',   salary: 138000 },
+  { id: 5,  name: 'Eva Rossi',      age: 36, city: 'Chicago',        role: 'Analyst',    salary: 115000 },
+  { id: 6,  name: 'Frank Liu',      age: 23, city: 'Los Angeles',    role: 'Intern',     salary: 52000  },
+  { id: 7,  name: 'Grace Kim',      age: 45, city: 'Boston',         role: 'Director',   salary: 210000 },
+  { id: 8,  name: 'Henry Park',     age: 31, city: 'Denver',         role: 'Engineer',   salary: 129000 },
+  { id: 9,  name: 'Isla Nguyen',    age: 38, city: 'Miami',          role: 'Designer',   salary: 107000 },
+  { id: 10, name: 'James Carter',   age: 52, city: 'Atlanta',        role: 'VP',         salary: 285000 },
+  { id: 11, name: 'Kayla Brown',    age: 26, city: 'Portland',       role: 'Analyst',    salary: 91000  },
+  { id: 12, name: 'Liam Patel',     age: 33, city: 'San Diego',      role: 'Engineer',   salary: 142000 },
+  { id: 13, name: 'Mia Torres',     age: 40, city: 'Phoenix',        role: 'Manager',    salary: 165000 },
+  { id: 14, name: 'Noah Gonzalez',  age: 22, city: 'San Jose',       role: 'Intern',     salary: 48000  },
+  { id: 15, name: 'Olivia Chen',    age: 37, city: 'San Francisco',  role: 'Architect',  salary: 198000 },
+  { id: 16, name: 'Pedro Silva',    age: 44, city: 'Houston',        role: 'Director',   salary: 225000 },
+  { id: 17, name: 'Quinn Walker',   age: 28, city: 'New York',       role: 'Engineer',   salary: 133000 },
+  { id: 18, name: 'Rachel Adams',   age: 35, city: 'Austin',         role: 'Designer',   salary: 112000 },
+  { id: 19, name: 'Sam Wilson',     age: 49, city: 'Chicago',        role: 'VP',         salary: 260000 },
+  { id: 20, name: 'Tina Zhang',     age: 30, city: 'Seattle',        role: 'Analyst',    salary: 104000 },
 ];
 
+type Theme = 'dark' | 'light';
+
+function useTheme() {
+  const [theme, setTheme] = useState<Theme>('dark');
+
+  useEffect(() => {
+    const stored = localStorage.getItem('lg-theme') as Theme | null;
+    const preferred = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    const resolved = stored ?? preferred;
+    setTheme(resolved);
+    document.documentElement.setAttribute('data-theme', resolved);
+  }, []);
+
+  function toggle() {
+    const next: Theme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('lg-theme', next);
+  }
+
+  return { theme, toggle };
+}
+
 export default function App() {
+  const { theme, toggle } = useTheme();
+
   return (
-    <div className="min-h-screen bg-[#0f1117] px-4 py-10 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-6xl">
+    <div style={{ minHeight: '100vh', background: 'var(--app-bg)', color: 'var(--app-text)', position: 'relative' }}>
+
+      {/* dot-grid texture */}
+      <div style={{
+        position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0, opacity: 0.35,
+        backgroundImage: 'radial-gradient(circle, var(--app-border) 1px, transparent 1px)',
+        backgroundSize: '28px 28px',
+      }} />
+
+      {/* scanlines */}
+      <div style={{
+        position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 1000,
+        background: 'repeating-linear-gradient(to bottom, transparent 0px, transparent 3px, rgba(0,0,0,0.06) 3px, rgba(0,0,0,0.06) 4px)',
+      }} />
+
+      <div style={{ position: 'relative', zIndex: 1, maxWidth: 1100, margin: '0 auto', padding: '0 1.5rem 4rem' }}>
+
+        {/* Nav */}
+        <nav style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '0 0', height: 52, borderBottom: '1px solid var(--app-border)',
+          marginBottom: '2.5rem',
+        }}>
+          <span style={{
+            fontWeight: 800, fontSize: '1.1rem', letterSpacing: '0.1em',
+            color: 'var(--app-green)', textShadow: '0 0 12px var(--app-glow)',
+          }}>
+            LOCAL GHOST<span style={{ animation: 'blink 1s step-end infinite' }}>_</span>
+          </span>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span style={{
+              fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.12em',
+              color: 'var(--app-muted)', border: '1px solid var(--app-border)',
+              padding: '0.25rem 0.6rem',
+            }}>
+              v1.2.0
+            </span>
+            <a
+              href="http://localhost:3001"
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.1em',
+                color: 'var(--app-muted)', textDecoration: 'none',
+                border: '1px solid transparent', padding: '0.25rem 0.6rem',
+              }}
+            >
+              [ Docs ]
+            </a>
+            <button
+              onClick={toggle}
+              style={{
+                fontFamily: 'inherit', fontSize: '0.65rem', fontWeight: 700,
+                letterSpacing: '0.1em', color: 'var(--app-muted)',
+                background: 'transparent', border: '1px solid var(--app-border)',
+                padding: '0.28rem 0.65rem', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: '0.35rem',
+              }}
+            >
+              <span style={{ fontSize: '0.8rem' }}>{theme === 'dark' ? '◑' : '◐'}</span>
+              {theme === 'dark' ? 'LIGHT' : 'DARK'}
+            </button>
+          </div>
+        </nav>
+
         {/* Header */}
-        <header className="mb-8">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/20 border border-indigo-500/30">
-              <svg
-                className="h-5 w-5 text-indigo-400"
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-                aria-hidden="true"
-              >
-                <path d="M10.75 10.818v2.614A3.13 3.13 0 0011.888 13c.482-.315.612-.648.612-.875 0-.227-.13-.560-.612-.875a3.13 3.13 0 00-1.138-.432zM8.33 8.62c.053.055.115.11.184.164.208.16.46.284.736.363V6.603a2.45 2.45 0 00-.35.13c-.14.065-.27.143-.386.233-.377.292-.514.627-.514.909 0 .184.058.39.33.586z" />
-                <path
-                  fillRule="evenodd"
-                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm2.25-14.083c.06.055.113.112.165.17a2.47 2.47 0 01.18 2.558L11.4 8.25h1.85a.75.75 0 01.6 1.2l-4.5 6a.75.75 0 01-.6.3h-1.5a.75.75 0 010-1.5h.705l-.6.8H5.25a.75.75 0 010-1.5h2.1l1.2-1.6H7.2a.75.75 0 01-.6-1.2L10.5 6H8.65a.75.75 0 01-.6-1.2L10.75 1.5a.75.75 0 011.5 2.417z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight text-white">
-                WebGPU AI Data Grid
-              </h1>
-              <p className="text-sm text-slate-400 mt-0.5">
-                Natural language queries — zero server round-trips
-              </p>
-            </div>
+        <header style={{ marginBottom: '2rem' }}>
+          <div style={{ marginBottom: '0.5rem' }}>
+            <span style={{
+              fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.16em',
+              color: 'var(--app-green-dim)', border: '1px solid var(--app-border)',
+              padding: '0.25rem 0.65rem', display: 'inline-block', marginBottom: '1rem',
+            }}>
+              LIVE DEMO — SmartDataGrid
+            </span>
           </div>
 
-          <div className="flex flex-wrap gap-2 mt-4">
+          <h1 style={{
+            fontSize: 'clamp(2rem, 5vw, 3.2rem)', fontWeight: 800, letterSpacing: '0.04em',
+            lineHeight: 1.1, marginBottom: '0.75rem',
+          }}>
+            ASK YOUR DATA{' '}
+            <span style={{ color: 'var(--app-green)', textShadow: '0 0 24px var(--app-glow)' }}>
+              ANYTHING.
+            </span>
+          </h1>
+
+          <p style={{
+            fontSize: '0.82rem', color: 'var(--app-muted)', lineHeight: 1.8,
+            marginBottom: '1.5rem', maxWidth: 520,
+          }}>
+            Natural language queries — zero server round-trips.<br />
+            Qwen2.5-Coder runs entirely on your GPU via WebGPU.
+          </p>
+
+          {/* example chips */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
             {[
               'show only users older than 30, sorted by name',
               'filter engineers earning over 130000',
               'show top 5 highest salaries',
               'users in San Francisco or New York',
-            ].map((example) => (
+            ].map((ex) => (
               <span
-                key={example}
-                className="inline-flex items-center rounded-full bg-slate-800 border border-slate-700 px-3 py-1 text-xs text-slate-400"
+                key={ex}
+                style={{
+                  fontSize: '0.68rem', letterSpacing: '0.04em',
+                  color: 'var(--app-muted)', border: '1px solid var(--app-border)',
+                  padding: '0.3rem 0.75rem', background: 'var(--app-surface)',
+                }}
               >
-                &ldquo;{example}&rdquo;
+                ❯ {ex}
               </span>
             ))}
           </div>
@@ -86,12 +182,25 @@ export default function App() {
         <SmartDataGrid data={SAMPLE_USERS as unknown as Record<string, unknown>[]} />
 
         {/* Footer */}
-        <footer className="mt-8 text-center text-xs text-slate-600">
-          Phase 1 &mdash; Powered by{' '}
-          <span className="text-slate-500">@huggingface/transformers v3</span>{' '}
-          &middot; Model runs entirely in your browser
+        <footer style={{
+          marginTop: '2.5rem',
+          borderTop: '1px solid var(--app-border)',
+          paddingTop: '1.25rem',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          fontSize: '0.65rem', color: 'var(--app-muted)', letterSpacing: '0.08em',
+          flexWrap: 'wrap', gap: '0.5rem',
+        }}>
+          <span>
+            <span style={{ color: 'var(--app-green)' }}>@dhruvil0210/local-ghost@1.2.0</span>
+            {' '}· Qwen2.5-Coder + WebGPU · MIT
+          </span>
+          <span>Model runs entirely in your browser — 0ms server latency</span>
         </footer>
       </div>
+
+      <style>{`
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+      `}</style>
     </div>
   );
 }

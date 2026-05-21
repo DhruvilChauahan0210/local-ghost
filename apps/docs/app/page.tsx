@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import ProjectStats from './ProjectStats';
 import ThemeToggle from './ThemeToggle';
+import CursorEffects from './CursorEffects';
 
 const TERMINAL_LINES = [
   { query: 'who earns the most?',                  result: 'Grace Kim — $210,000',    type: 'stat' },
@@ -29,6 +30,7 @@ export default function HomePage() {
   const [progress, setProgress]     = useState(0);
 
   const current = TERMINAL_LINES[lineIndex];
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     if (phase === 'typing') {
@@ -65,6 +67,7 @@ export default function HomePage() {
   return (
     <>
       <div className="scanlines" aria-hidden="true" />
+      <CursorEffects />
 
       <nav className="nav">
         <span className="nav-logo">LOCAL GHOST<span className="cursor blink">_</span></span>
@@ -73,8 +76,19 @@ export default function HomePage() {
           <a href="https://github.com/DhruvilChauahan0210/local-ghost" className="nav-link" target="_blank" rel="noreferrer">[ GitHub ]</a>
           <a href="http://localhost:5173" className="nav-link accent">[ Live Demo ]</a>
           <ThemeToggle />
+          <button className="nav-hamburger" onClick={() => setMenuOpen(o => !o)} aria-label="Menu">
+            {menuOpen ? '[ ✕ ]' : '[ ≡ ]'}
+          </button>
         </div>
       </nav>
+
+      {menuOpen && (
+        <div className="nav-mobile-menu" onClick={() => setMenuOpen(false)}>
+          <a href="https://www.npmjs.com/package/@dhruvil0210/local-ghost" className="nav-mobile-link" target="_blank" rel="noreferrer">[ npm ]</a>
+          <a href="https://github.com/DhruvilChauahan0210/local-ghost" className="nav-mobile-link" target="_blank" rel="noreferrer">[ GitHub ]</a>
+          <a href="http://localhost:5173" className="nav-mobile-link accent">[ Live Demo ]</a>
+        </div>
+      )}
 
       <main>
         {/* ── HERO ── */}
