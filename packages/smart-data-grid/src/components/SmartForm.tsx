@@ -63,7 +63,7 @@ function AIStatusBadge({
   error,
   mode,
 }: {
-  status: 'uninitialized' | 'loading' | 'ready' | 'error';
+  status: 'uninitialized' | 'loading' | 'ready' | 'error' | 'disposed';
   progress: number;
   error: string | null;
   mode: 'webgpu' | 'wasm' | 'server' | null;

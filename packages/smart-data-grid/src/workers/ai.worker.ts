@@ -2,312 +2,434 @@
 type TextGenerationPipeline = any;
 import { pipeline, env } from '@huggingface/transformers';
 
-// Persist model files in the browser's Cache API across page loads
 env.useBrowserCache = true;
 env.allowLocalModels = false;
 
+// Suppress ONNX WASM binary warnings — expected for quantized models
+const _warn = console.warn.bind(console);
+console.warn = (...args: unknown[]) => {
+  const msg = String(args[0] ?? '');
+  if (msg.includes('[W:onnxruntime:') || msg.includes('VerifyEachNodeIsAssignedToAnEp')) return;
+  _warn(...args);
+};
+
 type IncomingMessage =
   | { type: 'INIT' }
-  | { type: 'RUN_QUERY'; schema: string; userInput: string }
-  | { type: 'EXTRACT_JSON'; schema: string; userInput: string };
+  | { type: 'RUN_QUERY';    schema: string; userInput: string }
+  | { type: 'EXTRACT_JSON'; schema: string; userInput: string }
+  | { type: 'ANALYZE_DATA'; schema: string; userInput: string };
 
-// QUERY_ERROR / JSON_ERROR = inference-level failure (AI stays ready)
-// ERROR = initialization failure (AI goes to error state)
+// ERROR          = init-level failure — AI goes to 'error' state
+// QUERY_ERROR    = query-level failure — AI stays 'ready'
+// JSON_ERROR     = extraction-level failure — AI stays 'ready'
+// ANALYSIS_ERROR = analysis-level failure — AI stays 'ready'
 
 let generator: TextGenerationPipeline | null = null;
+const MODEL_ID = 'onnx-community/Qwen2.5-Coder-0.5B-Instruct';
 
-const SYSTEM_PROMPT = `You are a JavaScript code generator. Output ONLY a single arrow function expression. Nothing else.
+// ── VRAM idle timer ───────────────────────────────────────────────────────────
+const IDLE_MS = 5 * 60 * 1000;
+let idleTimer: ReturnType<typeof setTimeout> | null = null;
+
+function resetIdleTimer(): void {
+  if (idleTimer) clearTimeout(idleTimer);
+  idleTimer = setTimeout(async () => {
+    if (generator) {
+      if (typeof generator.dispose === 'function') await generator.dispose();
+      generator = null;
+      log('VRAM purged after 5 min idle. Re-enable AI to reload.');
+      self.postMessage({ type: 'SYSTEM_STATUS', status: 'disposed' });
+    }
+  }, IDLE_MS);
+}
+
+function log(msg: string): void {
+  self.postMessage({ type: 'LOG', message: `[LG_SYSTEM] ${msg}` });
+}
+
+// ── Model init ────────────────────────────────────────────────────────────────
+async function initModel(): Promise<void> {
+  const nav = navigator as Navigator & { gpu?: { requestAdapter: () => Promise<unknown> } };
+  const hasWebGPU = !!nav.gpu && !!(await nav.gpu.requestAdapter().catch(() => null));
+
+  log(`Initializing Web Worker core... SUCCESS`);
+  log(`Querying CacheStorage for ${MODEL_ID}...`);
+
+  let lastFile = '';
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const cb = (p: any) => {
+    const pct = Math.round(p.progress ?? 0);
+    self.postMessage({ type: 'PROGRESS', progress: pct });
+    if (p.status === 'initiate' && p.file !== lastFile) {
+      lastFile = p.file ?? '';
+      log(`Loading: ${lastFile}`);
+    }
+    if (p.status === 'download') log(`Downloading model chunk... ${pct}% complete`);
+    if (p.status === 'ready')    log(`Component ready: ${p.file ?? 'model'}`);
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const tryInit = async (device: 'webgpu' | 'wasm', dtype: any) => {
+    if (device === 'webgpu') log(`Allocating WebGPU command buffers and VRAM shaders...`);
+    else                     log(`Starting WASM inference engine (WebGPU unavailable)...`);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    generator = await pipeline('text-generation', MODEL_ID, { device, dtype, progress_callback: cb as any });
+    log(`Local Ghost is active. Running on ${device.toUpperCase()}.`);
+    self.postMessage({ type: 'READY', device });
+    resetIdleTimer();
+  };
+
+  try {
+    await tryInit(hasWebGPU ? 'webgpu' : 'wasm', hasWebGPU ? 'q4f16' : 'q8');
+  } catch {
+    if (hasWebGPU) {
+      try {
+        log(`WebGPU init failed. Falling back to WASM...`);
+        await tryInit('wasm', 'q8');
+      } catch (e) {
+        self.postMessage({ type: 'ERROR', message: e instanceof Error ? e.message : 'Init failed' });
+      }
+    } else {
+      self.postMessage({ type: 'ERROR', message: 'Failed to load model' });
+    }
+  }
+}
+
+// ── Shared helpers ────────────────────────────────────────────────────────────
+function extractOutput(output: unknown): string {
+  if (!Array.isArray(output) || output.length === 0) return '';
+  const first = output[0];
+  if (!first || typeof first !== 'object' || !('generated_text' in first)) return '';
+  const gen = (first as { generated_text: unknown }).generated_text;
+  if (Array.isArray(gen) && gen.length > 0) {
+    const last = gen[gen.length - 1];
+    if (last && typeof last === 'object' && 'content' in last)
+      return String((last as { content: unknown }).content);
+  }
+  if (typeof gen === 'string') return gen;
+  return '';
+}
+
+function stripFences(raw: string): string {
+  return raw.replace(/```(?:javascript|js|json)?\n?/gi, '').replace(/```/g, '').trim();
+}
+
+// ── SmartDataGrid ─────────────────────────────────────────────────────────────
+const GRID_PROMPT = `You are a JavaScript code generator. Output ONLY a single arrow function. Nothing else.
 
 Schema fields: {SCHEMA}
 
 Rules:
-- Output must start with: (data) =>
+- Must start with: (data) =>
 - Use only: .filter(), .map(), .sort(), .slice()
 - No imports, no declarations, no explanations, no markdown
-- String comparisons must use .toLowerCase() and .includes() for partial matches
-- For role/job/department filters use .includes() not ===
+- String comparisons: use .toLowerCase() and .includes() for partial matches
+- For role/job/department/city filters: prefer .includes() not ===
 
-Example output:
-(data) => data.filter(row => row.age > 30).sort((a, b) => a.name.localeCompare(b.name))
-(data) => data.filter(row => row.role.toLowerCase().includes('engineer'))`;
+Example: (data) => data.filter(row => row.age > 30).sort((a, b) => a.name.localeCompare(b.name))
+Example: (data) => data.filter(row => row.role.toLowerCase().includes('engineer'))`;
 
-// Code-tuned variant — same size (~300MB) but trained specifically for code generation
-const MODEL_ID = 'onnx-community/Qwen2.5-Coder-0.5B-Instruct';
+const STRING_FIELDS = ['city','role','department','country','status','type','job','title','category','gender','team','name'];
 
-async function initModel(): Promise<void> {
-  const progressCallback = (progressInfo: { progress?: number; status?: string }) => {
-    const pct = progressInfo.progress ?? 0;
-    self.postMessage({ type: 'PROGRESS', progress: Math.round(pct) });
-  };
-
-  const nav = navigator as Navigator & { gpu?: { requestAdapter: () => Promise<unknown> } };
-  const hasWebGPU = !!nav.gpu && !!(await nav.gpu.requestAdapter().catch(() => null));
-
-  try {
-    if (hasWebGPU) {
-      generator = await pipeline('text-generation', MODEL_ID, {
-        device: 'webgpu',
-        dtype: 'q4f16',
-        progress_callback: progressCallback,
-      });
-    } else {
-      generator = await pipeline('text-generation', MODEL_ID, {
-        device: 'wasm',
-        dtype: 'q8',
-        progress_callback: progressCallback,
-      });
-    }
-    self.postMessage({ type: 'READY' });
-  } catch (err) {
-    // If WebGPU dtype failed, retry with WASM
-    if (hasWebGPU) {
-      try {
-        generator = await pipeline('text-generation', MODEL_ID, {
-          device: 'wasm',
-          dtype: 'q8',
-          progress_callback: progressCallback,
-        });
-        self.postMessage({ type: 'READY' });
-      } catch (fallbackErr) {
-        const message = fallbackErr instanceof Error ? fallbackErr.message : 'Failed to initialize AI model';
-        self.postMessage({ type: 'ERROR', message });
-      }
-    } else {
-      const message = err instanceof Error ? err.message : 'Failed to initialize AI model';
-      self.postMessage({ type: 'ERROR', message });
-    }
-  }
-}
-
-/**
- * Rule-based fallback for common filter/sort patterns.
- * Returns a valid arrow function string, or null if no pattern matched.
- */
-function ruleBasedParse(input: string, fields: string[]): string | null {
+function fixBrokenArrowFn(input: string, fields: string[]): string | null {
   const q = input.toLowerCase().trim();
   const parts: string[] = [];
 
-  // --- filter: field > number ---
-  const gtMatch = q.match(/(\w+)\s*(?:older than|greater than|more than|above|>)\s*(\d+)/);
-  if (gtMatch) {
-    const field = fields.find(f => f.toLowerCase() === gtMatch[1]) ?? gtMatch[1];
-    parts.push(`row => row.${field} > ${gtMatch[2]}`);
+  const gtM = q.match(/(\w+)\s*(?:older than|greater than|more than|above|>)\s*(\d+)/);
+  if (gtM) {
+    const f = fields.find(f => f.toLowerCase() === gtM[1]) ?? gtM[1];
+    parts.push(`row.${f} > ${gtM[2]}`);
+  }
+  const ltM = q.match(/(\w+)\s*(?:younger than|less than|below|under|<)\s*(\d+)/);
+  if (ltM) {
+    const f = fields.find(f => f.toLowerCase() === ltM[1]) ?? ltM[1];
+    parts.push(`row.${f} < ${ltM[2]}`);
   }
 
-  // --- filter: field < number ---
-  const ltMatch = q.match(/(\w+)\s*(?:younger than|less than|below|under|<)\s*(\d+)/);
-  if (ltMatch) {
-    const field = fields.find(f => f.toLowerCase() === ltMatch[1]) ?? ltMatch[1];
-    parts.push(`row => row.${field} < ${ltMatch[2]}`);
-  }
-
-  const STRING_FIELDS = ['city', 'role', 'department', 'country', 'status', 'type', 'job', 'title', 'category', 'gender', 'team'];
-  const guessStringField = () => fields.find(f => STRING_FIELDS.includes(f.toLowerCase()));
-
-  // --- filter: "in X" / "from X" / "is X" ---
-  const eqMatch = q.match(/(?:in|from|with|is|=)\s+["']?([a-z][a-z\s]*)["']?/);
-  if (eqMatch && !gtMatch && !ltMatch) {
-    const value = eqMatch[1].trim();
-    const guessedField = guessStringField();
-    if (guessedField) {
-      parts.push(`row => String(row.${guessedField}).toLowerCase().includes('${value.toLowerCase()}')`);
-    }
-  }
-
-  // --- filter: "show only X" / "only X" / "filter X" / "find X" / bare noun ---
-  if (!gtMatch && !ltMatch && !eqMatch) {
-    const showMatch = q.match(/(?:show\s+only|only|filter|find|list|get|display)\s+([a-z][a-z\s]*)$/);
-    const bareNounMatch = !showMatch && q.match(/^([a-z][a-z\s]*)(?:\s+only)?$/);
-    const rawValue = ((showMatch ? showMatch[1] : null) ?? (bareNounMatch ? bareNounMatch[1] : null) ?? '').trim().replace(/s$/, '');
-    if (rawValue) {
-      const guessedField = guessStringField();
-      if (guessedField) {
-        parts.push(`row => String(row.${guessedField}).toLowerCase().includes('${rawValue.toLowerCase()}')`);
-      }
-    }
-  }
-
-  const filterExpr = parts.length > 0
-    ? `.filter(${parts.join(' && ')})`
+  const topM = q.match(/top\s+(\d+)/);
+  const sortM = q.match(/sort(?:ed)?\s+by\s+(\w+)(?:\s+(desc|asc))?/);
+  const sortField = sortM ? (fields.find(f => f.toLowerCase() === sortM[1]) ?? sortM[1]) : null;
+  const sortDir   = sortM?.[2] === 'desc' ? -1 : 1;
+  const sortExpr  = sortField
+    ? `.sort((a,b)=>{ const av=a['${sortField}'],bv=b['${sortField}']; if(typeof av==='number')return (av-bv)*${sortDir}; return String(av).localeCompare(String(bv))*${sortDir}; })`
     : '';
 
-  // --- sort ---
-  let sortExpr = '';
-  const sortMatch = q.match(/sort(?:ed)?\s+by\s+(\w+)(?:\s+(desc|asc))?/);
-  if (sortMatch) {
-    const field = fields.find(f => f.toLowerCase() === sortMatch[1]) ?? sortMatch[1];
-    const dir = sortMatch[2] === 'desc' ? -1 : 1;
-    sortExpr = `.sort((a, b) => {
-      const av = a.${field}; const bv = b.${field};
-      if (typeof av === 'number') return (av - bv) * ${dir};
-      return String(av).localeCompare(String(bv)) * ${dir};
-    })`;
+  const eqM = q.match(/(?:in|from|with|is|=)\s+["']?([a-z][a-z\s]*)["']?/);
+  if (eqM && !gtM && !ltM) {
+    const value = eqM[1].trim();
+    const sf = fields.find(f => STRING_FIELDS.includes(f.toLowerCase()));
+    if (sf) parts.push(`String(row['${sf}']).toLowerCase().includes('${value.toLowerCase()}')`);
   }
 
-  if (!filterExpr && !sortExpr) return null;
-  return `(data) => data${filterExpr}${sortExpr}`;
+  const countM = q.match(/(?:how many|count(?:\s+of)?|number of)\s+([a-z][a-z\s]*?)(?:\s+are there)?$/);
+  if (countM && !gtM && !ltM) {
+    const rawVal = countM[1].trim().replace(/s$/, '');
+    if (rawVal.length > 2) {
+      const sf = fields.find(f => STRING_FIELDS.includes(f.toLowerCase()));
+      if (sf) parts.push(`String(row['${sf}']).toLowerCase().includes('${rawVal.toLowerCase()}')`);
+    }
+  }
+
+  if (!gtM && !ltM && !eqM && !countM) {
+    const showM = q.match(/(?:show\s+only|only|filter|find|list|get|display)\s+([a-z][a-z\s]*)$/);
+    const bareM = !showM ? q.match(/^([a-z][a-z\s]*)(?:\s+only)?$/) : null;
+    const rawVal = ((showM ? showM[1] : null) ?? (bareM ? bareM[1] : null) ?? '').trim().replace(/s$/, '');
+    if (rawVal && rawVal.length > 2) {
+      const sf = fields.find(f => STRING_FIELDS.includes(f.toLowerCase()));
+      if (sf) parts.push(`String(row['${sf}']).toLowerCase().includes('${rawVal.toLowerCase()}')`);
+    }
+  }
+
+  if (!parts.length && !sortExpr && !topM) return null;
+
+  const filterExpr = parts.length ? `.filter(row => ${parts.join(' && ')})` : '';
+  const sliceExpr  = topM ? `.slice(0, ${topM[1]})` : '';
+  const autoSort   = topM && !sortM
+    ? (() => {
+        const numField = fields.find(f => !['id','name'].includes(f.toLowerCase()));
+        return numField ? `.sort((a,b)=>Number(b['${numField}'])-Number(a['${numField}']))` : '';
+      })()
+    : '';
+
+  return `(data) => data${filterExpr}${autoSort}${sortExpr}${sliceExpr}`;
 }
 
 async function runQuery(schema: string, userInput: string): Promise<void> {
-  if (!generator) {
-    self.postMessage({
-      type: 'ERROR',
-      message: 'Model not initialized. Please wait for initialization to complete.',
-    });
-    return;
-  }
-
-  const systemContent = SYSTEM_PROMPT.replace('{SCHEMA}', schema);
-
+  if (!generator) { self.postMessage({ type: 'QUERY_ERROR', message: 'Model not ready' }); return; }
+  resetIdleTimer();
   const messages = [
-    { role: 'system', content: systemContent },
-    { role: 'user', content: `Request: ${userInput}\nOutput:` },
+    { role: 'system', content: GRID_PROMPT.replace('{SCHEMA}', schema) },
+    { role: 'user',   content: `Request: ${userInput}\nOutput:` },
   ];
-
   try {
-    const output = await generator(messages, {
-      max_new_tokens: 256,
-      do_sample: false,
-      temperature: 0.1,
-    });
-
-    let code = '';
-
-    if (Array.isArray(output) && output.length > 0) {
-      const first = output[0];
-      if (
-        first &&
-        typeof first === 'object' &&
-        'generated_text' in first
-      ) {
-        const generated = first.generated_text;
-        if (Array.isArray(generated) && generated.length > 0) {
-          const last = generated[generated.length - 1];
-          if (last && typeof last === 'object' && 'content' in last) {
-            code = String(last.content);
-          }
-        } else if (typeof generated === 'string') {
-          code = generated;
-        }
-      }
-    }
-
-    // Strip markdown fences
-    code = code
-      .replace(/```(?:javascript|js)?\n?/gi, '')
-      .replace(/```/g, '')
-      .trim();
-
-    // Extract the arrow function — find the first (data) => ... occurrence
-    const arrowMatch = code.match(/\(data\)\s*=>.+/s);
-    if (arrowMatch) {
-      code = arrowMatch[0].trim();
-    }
-
-    // Validate — if LLM output is broken, try rule-based fallback
+    const raw = stripFences(extractOutput(
+      await generator(messages, { max_new_tokens: 200, do_sample: false, temperature: 0.1 })
+    ));
+    const arrowMatch = raw.match(/\(data\)\s*=>.+/s);
+    const code = arrowMatch ? arrowMatch[0].trim() : raw;
     try {
-      new Function('data', `return (${code})([])`);
+      const testResult = (new Function('data', `return (${code})([])`))([] as Record<string, unknown>[]);
+      if (!Array.isArray(testResult)) throw new Error('not an array');
+      self.postMessage({ type: 'QUERY_RESULT', code, usedFallback: false });
     } catch {
-      const fields = schema.split(',').map(s => s.trim());
-      const fallback = ruleBasedParse(userInput, fields);
-      if (fallback) {
-        self.postMessage({ type: 'QUERY_RESULT', code: fallback });
-        return;
+      const fixed = fixBrokenArrowFn(userInput, schema.split(',').map(s => s.trim()));
+      if (fixed) {
+        self.postMessage({ type: 'QUERY_RESULT', code: fixed, usedFallback: true });
+      } else {
+        self.postMessage({
+          type: 'QUERY_ERROR',
+          message: `Could not parse "${userInput}". For aggregations use analyzeData. Try: "age > 30", "sort by salary desc", "show only engineers".`,
+        });
       }
-      // QUERY_ERROR keeps the AI status as 'ready' — only THIS query failed
-      self.postMessage({
-        type: 'QUERY_ERROR',
-        message: `Could not parse "${userInput}". Try: "age > 30", "sort by name desc", "show only engineers"`,
-      });
-      return;
     }
-
-    self.postMessage({ type: 'QUERY_RESULT', code });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Inference failed';
-    self.postMessage({ type: 'QUERY_ERROR', message });
+    self.postMessage({ type: 'QUERY_ERROR', message: err instanceof Error ? err.message : 'Inference failed' });
   }
 }
 
-const JSON_EXTRACT_SYSTEM_PROMPT = `You are a data extraction assistant. Extract information from the provided text and return ONLY a valid JSON object matching the given schema fields. No explanation, no markdown, just the JSON object.`;
+// ── SmartForm ─────────────────────────────────────────────────────────────────
+const FORM_PROMPT = `Extract information from the text and return ONLY a valid JSON object.
+Schema fields: {SCHEMA}
+Rules: Return only field values that are clearly present. Use null for missing fields. No explanation, no markdown.
+Example output: {"email":"alice@example.com","name":"Alice"}`;
 
 async function extractJSON(schema: string, userInput: string): Promise<void> {
-  if (!generator) {
-    self.postMessage({
-      type: 'ERROR',
-      message: 'Model not initialized. Please wait for initialization to complete.',
-    });
-    return;
-  }
-
+  if (!generator) { self.postMessage({ type: 'JSON_ERROR', message: 'Model not ready' }); return; }
+  resetIdleTimer();
   const messages = [
-    { role: 'system', content: `${JSON_EXTRACT_SYSTEM_PROMPT}\n\nSchema fields (JSON): ${schema}` },
-    { role: 'user', content: userInput },
+    { role: 'system', content: FORM_PROMPT.replace('{SCHEMA}', schema) },
+    { role: 'user',   content: `Text: """${userInput}"""\nOutput:` },
   ];
-
   try {
-    const output = await generator(messages, {
-      max_new_tokens: 512,
-      do_sample: false,
-      temperature: 0.1,
-    });
-
-    let raw = '';
-
-    if (Array.isArray(output) && output.length > 0) {
-      const first = output[0];
-      if (first && typeof first === 'object' && 'generated_text' in first) {
-        const generated = first.generated_text;
-        if (Array.isArray(generated) && generated.length > 0) {
-          const last = generated[generated.length - 1];
-          if (last && typeof last === 'object' && 'content' in last) {
-            raw = String(last.content);
-          }
-        } else if (typeof generated === 'string') {
-          raw = generated;
-        }
-      }
-    }
-
-    // Strip markdown fences if the model wraps in ```json ... ```
-    raw = raw
-      .replace(/```(?:json)?\n?/gi, '')
-      .replace(/```/g, '')
-      .trim();
-
-    // Extract the first {...} block
+    const raw = stripFences(extractOutput(
+      await generator(messages, { max_new_tokens: 300, do_sample: false, temperature: 0.1 })
+    ));
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      self.postMessage({ type: 'JSON_RESULT', data: {} });
-      return;
-    }
-
-    try {
-      const parsed = JSON.parse(jsonMatch[0]) as Record<string, string>;
-      self.postMessage({ type: 'JSON_RESULT', data: parsed });
-    } catch {
-      self.postMessage({ type: 'JSON_RESULT', data: {} });
-    }
+    if (!jsonMatch) { self.postMessage({ type: 'JSON_RESULT', data: {} }); return; }
+    try { self.postMessage({ type: 'JSON_RESULT', data: JSON.parse(jsonMatch[0]) }); }
+    catch { self.postMessage({ type: 'JSON_RESULT', data: {} }); }
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'JSON extraction failed';
-    self.postMessage({ type: 'JSON_ERROR', message });
+    self.postMessage({ type: 'JSON_ERROR', message: err instanceof Error ? err.message : 'Extraction failed' });
   }
 }
 
+// ── SmartAnalytics ────────────────────────────────────────────────────────────
+const ANALYZE_PROMPT = `You are a data analysis AI. Dataset columns: {SCHEMA}
+
+Pick the BEST action for the query and output ONLY a valid JSON object. No explanation, no markdown.
+
+─── CHART ── visual graph
+{"action":"chart","type":"bar","xKey":"role","yKey":"salary","aggregation":"avg","title":"Avg Salary by Role"}
+{"action":"chart","type":"scatter","xKey":"age","yKey":"salary","title":"Age vs Salary"}
+{"action":"chart","type":"pie","xKey":"city","aggregation":"count","title":"Employees by City"}
+
+─── TABLE ── list, rank, sort, top N
+{"action":"table","sortBy":"salary","sortDir":"desc","limit":5,"title":"Top 5 Earners"}
+{"action":"table","filterField":"role","filterOp":"contains","filterValue":"engineer","title":"Engineers"}
+
+─── STAT ── single number (how many, average, total, highest, lowest, who)
+{"action":"stat","metric":"max","field":"salary","label":"Highest Salary"}
+{"action":"stat","metric":"avg","field":"salary","label":"Average Salary"}
+{"action":"stat","metric":"count","label":"Total Employees"}
+{"action":"stat","metric":"sum","field":"salary","label":"Total Payroll"}
+
+─── FILTER ── rows matching a condition
+{"action":"filter","field":"salary","op":">","value":100000,"title":"Salary Over 100k"}
+
+Valid chart types: bar, line, pie, scatter
+Valid aggregations/metrics: count, avg, sum, max, min
+Valid sortDir: asc, desc
+Valid op/filterOp: >, <, =, contains
+
+Output ONLY the JSON object.`;
+
+const NUMERIC_HINTS = ['salary','age','price','amount','cost','revenue','score','value','rate','income','pay','wage'];
+const STRING_HINTS  = ['name','city','role','department','type','status','country','team','category','title'];
+
+function pickField(fields: string[], hints: string[]): string | undefined {
+  return fields.find(f => hints.some(h => f.toLowerCase().includes(h)));
+}
+
+function normalizeResult(r: Record<string, unknown>, schema: string, query: string): Record<string, unknown> {
+  const fields = schema.split(',').map(s => s.trim());
+  const q = `${r['label'] ?? ''} ${r['title'] ?? ''} ${query}`.toLowerCase();
+  const numF = pickField(fields, NUMERIC_HINTS) ?? fields[fields.length - 1];
+  const strF = pickField(fields, STRING_HINTS)  ?? fields[0];
+  const CHART_TYPES   = ['bar','line','pie','scatter'];
+  const VALID_ACTIONS = ['chart','filter','table','stat'];
+
+  if (!r['action']) {
+    if (CHART_TYPES.includes(String(r['type']))) r['action'] = 'chart';
+    else if (r['metric'])                        r['action'] = 'stat';
+    else if (r['sortBy'])                        r['action'] = 'table';
+    else if (r['field'] && r['op'])              r['action'] = 'filter';
+  }
+  if (r['action'] === 'stat') {
+    if (!r['metric']) {
+      if (/average|avg|mean/.test(q))                      r['metric'] = 'avg';
+      else if (/total|sum|payroll/.test(q))                r['metric'] = 'sum';
+      else if (/max|highest|most|top|best|earns?|earner/.test(q)) r['metric'] = 'max';
+      else if (/min|lowest|least|youngest|fewest/.test(q)) r['metric'] = 'min';
+      else                                                 r['metric'] = 'count';
+    }
+    if (r['metric'] !== 'count' && !r['field'])
+      r['field'] = r['yKey'] ?? r['xKey'] ?? numF;
+  }
+  if (r['action'] === 'table') {
+    if (!r['sortBy']) { r['sortBy'] = numF; r['sortDir'] = r['sortDir'] ?? 'desc'; }
+  }
+  if (r['action'] === 'chart') {
+    if (!r['xKey']) r['xKey'] = strF;
+    if (r['type'] !== 'scatter' && !r['yKey'] && !r['aggregation']) r['aggregation'] = 'count';
+    if (r['type'] !== 'scatter' && !r['yKey'] && r['aggregation'] !== 'count') r['yKey'] = numF;
+  }
+  if (r['action'] === 'filter' && !r['op']) r['op'] = 'contains';
+  if (!VALID_ACTIONS.includes(String(r['action']))) {
+    r['action'] = 'table'; r['sortBy'] = numF; r['sortDir'] = 'desc';
+  }
+  return r;
+}
+
+function ruleBasedAnalysis(query: string, schema: string): Record<string, unknown> | null {
+  const q = query.toLowerCase();
+  const fields = schema.split(',').map(s => s.trim());
+  const numF = pickField(fields, NUMERIC_HINTS) ?? fields[fields.length - 1];
+  const strF = pickField(fields, STRING_HINTS)  ?? fields[0];
+
+  if (/who.*(earn|make|paid|salary|wage)/.test(q) || /highest.*(earn|paid|salary|wage)/.test(q) || /most.*(earn|paid)/.test(q))
+    return { action:'stat', metric:'max', field: pickField(fields,['salary','wage','pay','income']) ?? numF, label:'Highest Earner' };
+  if (/youngest/.test(q)) return { action:'stat', metric:'min', field: pickField(fields,['age']) ?? numF, label:'Youngest' };
+  if (/oldest|eldest/.test(q)) return { action:'stat', metric:'max', field: pickField(fields,['age']) ?? numF, label:'Oldest' };
+
+  const avgM = q.match(/(?:average|avg|mean)\s+(?:of\s+)?(\w+)/);
+  if (avgM) {
+    const f = fields.find(f => f.toLowerCase() === avgM[1]) ?? numF;
+    return { action:'stat', metric:'avg', field:f, label:`Average ${f}` };
+  }
+  const sumM = q.match(/(?:total|sum(?:\s+of)?|payroll)\s*(?:of\s+|the\s+)?(\w+)?/);
+  if (sumM) {
+    const f = (sumM[1] && fields.find(f => f.toLowerCase() === sumM[1])) ?? numF;
+    return { action:'stat', metric:'sum', field:f, label:`Total ${f}` };
+  }
+  const maxM = q.match(/(?:max(?:imum)?|highest|greatest)\s+(?:the\s+)?(\w+)/);
+  if (maxM) { const f = fields.find(f => f.toLowerCase() === maxM[1]) ?? numF; return { action:'stat', metric:'max', field:f, label:`Highest ${f}` }; }
+  const minM = q.match(/(?:min(?:imum)?|lowest|least|smallest)\s+(?:the\s+)?(\w+)/);
+  if (minM) { const f = fields.find(f => f.toLowerCase() === minM[1]) ?? numF; return { action:'stat', metric:'min', field:f, label:`Lowest ${f}` }; }
+
+  const topM = q.match(/(?:top|best|highest)\s+(\d+)/);
+  if (topM) return { action:'table', sortBy:numF, sortDir:'desc', limit:parseInt(topM[1]), title:`Top ${topM[1]}` };
+  const botM = q.match(/(?:bottom|worst|lowest)\s+(\d+)/);
+  if (botM) return { action:'table', sortBy:numF, sortDir:'asc', limit:parseInt(botM[1]), title:`Bottom ${botM[1]}` };
+
+  if (/how many|total count|total number/.test(q)) return { action:'stat', metric:'count', label:'Total Count' };
+
+  const cntByM = q.match(/(?:count|group|breakdown|distribute)\s+by\s+(\w+)/);
+  if (cntByM) { const f = fields.find(f => f.toLowerCase() === cntByM[1]) ?? strF; return { action:'chart', type:'bar', xKey:f, aggregation:'count', title:`Count by ${f}` }; }
+
+  const avgByM = q.match(/(?:avg|average)\s+(\w+)\s+by\s+(\w+)/);
+  if (avgByM) {
+    const yK = fields.find(f => f.toLowerCase() === avgByM[1]) ?? numF;
+    const xK = fields.find(f => f.toLowerCase() === avgByM[2]) ?? strF;
+    return { action:'chart', type:'bar', xKey:xK, yKey:yK, aggregation:'avg', title:`Avg ${yK} by ${xK}` };
+  }
+  const scatM = q.match(/(?:scatter|plot)\s+(\w+)\s+(?:vs|against|versus)\s+(\w+)/);
+  if (scatM) {
+    const xK = fields.find(f => f.toLowerCase() === scatM[1]) ?? scatM[1];
+    const yK = fields.find(f => f.toLowerCase() === scatM[2]) ?? scatM[2];
+    return { action:'chart', type:'scatter', xKey:xK, yKey:yK, title:`${xK} vs ${yK}` };
+  }
+  const sortM = q.match(/(?:sort|rank|order)\s+by\s+(\w+)(?:\s+(desc|asc))?/);
+  if (sortM) { const f = fields.find(f => f.toLowerCase() === sortM[1]) ?? sortM[1]; return { action:'table', sortBy:f, sortDir: sortM[2] === 'asc' ? 'asc' : 'desc', title:`Sorted by ${f}` }; }
+
+  const showM = q.match(/(?:show|list|find|filter|display)\s+(?:all\s+)?([a-z][a-z\s]*)$/);
+  if (showM) {
+    const val = showM[1].trim().replace(/s$/, '');
+    if (val.length > 2) return { action:'filter', field: pickField(fields, STRING_HINTS) ?? strF, op:'contains', value:val, title:`Filter: ${val}` };
+  }
+  return null;
+}
+
+async function analyzeData(schema: string, userInput: string): Promise<void> {
+  if (!generator) { self.postMessage({ type: 'ANALYSIS_ERROR', message: 'Model not ready' }); return; }
+  resetIdleTimer();
+
+  const ruleResult = ruleBasedAnalysis(userInput, schema);
+
+  const messages = [
+    { role: 'system', content: ANALYZE_PROMPT.replace('{SCHEMA}', schema) },
+    { role: 'user',   content: `Query: "${userInput}"\nOutput:` },
+  ];
+  try {
+    const raw = stripFences(extractOutput(
+      await generator(messages, { max_new_tokens: 150, do_sample: false, temperature: 0.1 })
+    ));
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      if (ruleResult) { self.postMessage({ type: 'ANALYSIS_RESULT', result: ruleResult }); return; }
+      self.postMessage({ type: 'ANALYSIS_ERROR', message: 'Could not interpret query. Try: "average salary by role", "who earns the most", "top 5 earners".' });
+      return;
+    }
+    try {
+      let result = JSON.parse(jsonMatch[0]) as Record<string, unknown>;
+      result = normalizeResult(result, schema, userInput);
+      self.postMessage({ type: 'ANALYSIS_RESULT', result });
+    } catch {
+      if (ruleResult) { self.postMessage({ type: 'ANALYSIS_RESULT', result: ruleResult }); return; }
+      self.postMessage({ type: 'ANALYSIS_ERROR', message: 'AI output was malformed. Try rephrasing.' });
+    }
+  } catch (err) {
+    if (ruleResult) { self.postMessage({ type: 'ANALYSIS_RESULT', result: ruleResult }); return; }
+    self.postMessage({ type: 'ANALYSIS_ERROR', message: err instanceof Error ? err.message : 'Analysis failed' });
+  }
+}
+
+// ── Message router ────────────────────────────────────────────────────────────
 self.onmessage = async (event: MessageEvent<IncomingMessage>) => {
   const msg = event.data;
-
   switch (msg.type) {
-    case 'INIT':
-      await initModel();
-      break;
-
-    case 'RUN_QUERY':
-      await runQuery(msg.schema, msg.userInput);
-      break;
-
-    case 'EXTRACT_JSON':
-      await extractJSON(msg.schema, msg.userInput);
-      break;
+    case 'INIT':         await initModel(); break;
+    case 'RUN_QUERY':    await runQuery(msg.schema, msg.userInput); break;
+    case 'EXTRACT_JSON': await extractJSON(msg.schema, msg.userInput); break;
+    case 'ANALYZE_DATA': await analyzeData(msg.schema, msg.userInput); break;
   }
 };

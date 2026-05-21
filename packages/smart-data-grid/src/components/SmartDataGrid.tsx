@@ -28,7 +28,7 @@ function AIStatusBadge({
   progress,
   error,
 }: {
-  status: 'uninitialized' | 'loading' | 'ready' | 'error';
+  status: 'uninitialized' | 'loading' | 'ready' | 'error' | 'disposed';
   progress: number;
   error: string | null;
 }) {
@@ -148,7 +148,7 @@ export function SmartDataGrid({ data }: SmartDataGridProps) {
     const schema = columns.join(', ');
 
     try {
-      const code = await ai.runQuery(schema, query.trim());
+      const { code } = await ai.runQuery(schema, query.trim());
 
       const result = safelyExecuteGeneratedCode(code, data);
 
@@ -218,7 +218,7 @@ export function SmartDataGrid({ data }: SmartDataGridProps) {
           />
         </div>
 
-        {ai.status === 'uninitialized' && (
+        {(ai.status === 'uninitialized' || ai.status === 'disposed') && (
           <div className="mb-3 flex items-center justify-between rounded-lg border border-slate-700/60 bg-slate-800/40 px-4 py-3">
             <div>
               <p className="text-sm font-medium text-slate-200">Enable Local AI</p>
