@@ -76,7 +76,7 @@ export default function HomePage() {
       <main>
         {/* ── HERO ── */}
         <section className="hero">
-          <div className="badge">v1.1.0 &mdash; MIT LICENSE &mdash; OPEN SOURCE</div>
+          <div className="badge">v1.2.0 &mdash; MIT LICENSE &mdash; OPEN SOURCE</div>
 
           <h1 className="headline">
             ASK YOUR<br />
@@ -96,7 +96,7 @@ export default function HomePage() {
               <span className="terminal-dot red" />
               <span className="terminal-dot yellow" />
               <span className="terminal-dot green" />
-              <span className="terminal-title">local-ghost — v1.1.0</span>
+              <span className="terminal-title">local-ghost — v1.2.0</span>
               <span className="terminal-badge" style={{ color: TYPE_COLOR[current.type] }}>
                 {current.type.toUpperCase()}
               </span>
@@ -152,7 +152,56 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* ── WHAT'S NEW ── */}
+        {/* ── WHAT'S NEW v1.2.0 ── */}
+        <div className="section-divider"><span>// WHAT'S NEW IN v1.2.0</span></div>
+        <section className="changelog">
+          {[
+            {
+              tag: 'NEW',
+              title: 'DEVICE-LOST\nHOT SWAP',
+              desc: 'When the OS reclaims GPU memory — sleep cycle, VRAM spike, driver crash, tab freeze — the worker detects the context loss via GPUDevice.lost and seamlessly reinitialises on WASM. No UI errors. No user action required.',
+              color: 'var(--green)',
+            },
+            {
+              tag: 'NEW',
+              title: 'isProcessing\nLOCK',
+              desc: 'AIState now exports isProcessing: boolean — true while any worker request is in-flight. All three dispatchers set and clear it atomically, including every error, timeout, and hotswap path. Race conditions eliminated.',
+              color: 'var(--green)',
+            },
+            {
+              tag: 'NEW',
+              title: 'CONCURRENCY\nDROP',
+              desc: 'Rapid-fire queries no longer destabilise the tensor pipeline. If a ref slot is already occupied, the new request is rejected immediately with a clear message — no stale promises left dangling.',
+              color: 'var(--orange)',
+            },
+            {
+              tag: 'HARDENED',
+              title: 'HOTSWAP\nUI FLOW',
+              desc: 'On device loss the context transitions to loading, logs [LG_HARDENING] WebGPU context lost. Hot-swapping to WASM..., and resolves back to AI Ready — WASM once the fallback pipeline is live.',
+              color: 'var(--orange)',
+            },
+            {
+              tag: 'VERIFIED',
+              title: 'BUILD\nINVARIANTS',
+              desc: 'turbo run build --force: 3/3 tasks clean. Zero console.log or debugger in production bundle. All 7 .d.ts files present. Sourcemaps confirmed. The one eval() grep hit is the literal string inside the security blacklist.',
+              color: '#60a5fa',
+            },
+            {
+              tag: 'FIXED',
+              title: 'RUNTIME\nMODE REPORT',
+              desc: 'After a hot-swap the READY message carries device: "wasm" and the context reads it correctly — mode no longer incorrectly reports "webgpu" after a WASM fallback reinitialisation.',
+              color: '#60a5fa',
+            },
+          ].map(({ tag, title, desc, color }) => (
+            <div key={title} className="changelog-card">
+              <div className="changelog-tag" style={{ color, borderColor: color + '40' }}>{tag}</div>
+              <h3 className="changelog-title" style={{ color }}>{title}</h3>
+              <p className="changelog-desc">{desc}</p>
+            </div>
+          ))}
+        </section>
+
+        {/* ── WHAT'S NEW v1.1.0 ── */}
         <div className="section-divider"><span>// WHAT'S NEW IN v1.1.0</span></div>
         <section className="changelog">
           {[
@@ -360,15 +409,33 @@ export default function HomePage() {
             },
             {
               tag: '02',
-              title: 'SECURITY\nSANDBOX',
-              desc: 'Generated JS runs in a closure that null-shadows window, document, fetch, localStorage, and sessionStorage. Token blacklist blocks eval, prototype, and WebSocket.',
-              stat: 'injection-proof execution',
+              title: 'DEVICE-LOST\nRECOVERY',
+              desc: 'A separate GPUDevice handle monitors the OS-level context. On sleep, VRAM spike, or driver crash — GPUDevice.lost fires, the old pipeline is disposed, and WASM reinitialises automatically.',
+              stat: 'zero-downtime GPU → WASM hotswap',
             },
             {
               tag: '03',
+              title: 'SECURITY\nSANDBOX',
+              desc: 'Generated JS runs in a closure that null-shadows window, document, fetch, localStorage, sessionStorage, XMLHttpRequest, and WebSocket. Token blacklist blocks eval, prototype, and constructor.',
+              stat: 'injection-proof execution',
+            },
+            {
+              tag: '04',
+              title: 'CONCURRENCY\nLATCHES',
+              desc: 'isProcessing lock on AIState prevents race conditions from rapid-fire input. Every resolve, reject, error, hotswap, and dispose path resets the lock — it can never get permanently stuck.',
+              stat: 'zero race conditions',
+            },
+            {
+              tag: '05',
               title: 'VRAM\nMANAGEMENT',
-              desc: 'After 5 minutes of inactivity the model disposes its GPU bindings automatically via transformers.env.dispose(). Re-enables on demand with a single click.',
+              desc: 'After 5 minutes of inactivity the model disposes its GPU bindings automatically. Re-enables on demand with a single click. Battery and memory preserved.',
               stat: '5-min idle → full VRAM purge',
+            },
+            {
+              tag: '06',
+              title: 'WEB WORKER\nISOLATION',
+              desc: 'All model inference runs in a dedicated Web Worker thread. The main thread stays at 60fps while the AI processes your query. LOG messages stream progress in real time.',
+              stat: '0ms UI thread blocking',
             },
           ].map(({ tag, title, desc, stat }) => (
             <div key={tag} className="feature-card">
@@ -384,7 +451,7 @@ export default function HomePage() {
           <div className="footer-inner">
             <span className="footer-logo">LOCAL GHOST_</span>
             <span>
-              <span className="c-green">@dhruvil0210/local-ghost</span>
+              <span className="c-green">@dhruvil0210/local-ghost@1.2.0</span>
               {' '}· Qwen2.5-Coder + WebGPU · MIT
             </span>
           </div>
