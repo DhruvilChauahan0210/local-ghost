@@ -11,6 +11,9 @@ type IncomingMessage =
   | { type: 'RUN_QUERY'; schema: string; userInput: string }
   | { type: 'EXTRACT_JSON'; schema: string; userInput: string };
 
+// QUERY_ERROR / JSON_ERROR = inference-level failure (AI stays ready)
+// ERROR = initialization failure (AI goes to error state)
+
 let generator: TextGenerationPipeline | null = null;
 
 const SYSTEM_PROMPT = `You are a JavaScript code generator. Output ONLY a single arrow function expression. Nothing else.
@@ -21,10 +24,12 @@ Rules:
 - Output must start with: (data) =>
 - Use only: .filter(), .map(), .sort(), .slice()
 - No imports, no declarations, no explanations, no markdown
-- String comparisons must use .toLowerCase()
+- String comparisons must use .toLowerCase() and .includes() for partial matches
+- For role/job/department filters use .includes() not ===
 
 Example output:
-(data) => data.filter(row => row.age > 30).sort((a, b) => a.name.localeCompare(b.name))`;
+(data) => data.filter(row => row.age > 30).sort((a, b) => a.name.localeCompare(b.name))
+(data) => data.filter(row => row.role.toLowerCase().includes('engineer'))`;
 
 // Code-tuned variant — same size (~300MB) but trained specifically for code generation
 const MODEL_ID = 'onnx-community/Qwen2.5-Coder-0.5B-Instruct';
@@ -96,15 +101,29 @@ function ruleBasedParse(input: string, fields: string[]): string | null {
     parts.push(`row => row.${field} < ${ltMatch[2]}`);
   }
 
-  // --- filter: field = string ---
+  const STRING_FIELDS = ['city', 'role', 'department', 'country', 'status', 'type', 'job', 'title', 'category', 'gender', 'team'];
+  const guessStringField = () => fields.find(f => STRING_FIELDS.includes(f.toLowerCase()));
+
+  // --- filter: "in X" / "from X" / "is X" ---
   const eqMatch = q.match(/(?:in|from|with|is|=)\s+["']?([a-z][a-z\s]*)["']?/);
   if (eqMatch && !gtMatch && !ltMatch) {
     const value = eqMatch[1].trim();
-    const guessedField = fields.find(f =>
-      ['city', 'role', 'department', 'country', 'status', 'type'].includes(f.toLowerCase())
-    );
+    const guessedField = guessStringField();
     if (guessedField) {
-      parts.push(`row => row.${guessedField}.toLowerCase() === '${value.toLowerCase()}'`);
+      parts.push(`row => String(row.${guessedField}).toLowerCase().includes('${value.toLowerCase()}')`);
+    }
+  }
+
+  // --- filter: "show only X" / "only X" / "filter X" / "find X" / bare noun ---
+  if (!gtMatch && !ltMatch && !eqMatch) {
+    const showMatch = q.match(/(?:show\s+only|only|filter|find|list|get|display)\s+([a-z][a-z\s]*)$/);
+    const bareNounMatch = !showMatch && q.match(/^([a-z][a-z\s]*)(?:\s+only)?$/);
+    const rawValue = ((showMatch ? showMatch[1] : null) ?? (bareNounMatch ? bareNounMatch[1] : null) ?? '').trim().replace(/s$/, '');
+    if (rawValue) {
+      const guessedField = guessStringField();
+      if (guessedField) {
+        parts.push(`row => String(row.${guessedField}).toLowerCase().includes('${rawValue.toLowerCase()}')`);
+      }
     }
   }
 
@@ -195,9 +214,10 @@ async function runQuery(schema: string, userInput: string): Promise<void> {
         self.postMessage({ type: 'QUERY_RESULT', code: fallback });
         return;
       }
+      // QUERY_ERROR keeps the AI status as 'ready' — only THIS query failed
       self.postMessage({
-        type: 'ERROR',
-        message: `Could not parse query. Try: "filter by age > 30, sort by name"`,
+        type: 'QUERY_ERROR',
+        message: `Could not parse "${userInput}". Try: "age > 30", "sort by name desc", "show only engineers"`,
       });
       return;
     }
@@ -205,7 +225,7 @@ async function runQuery(schema: string, userInput: string): Promise<void> {
     self.postMessage({ type: 'QUERY_RESULT', code });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Inference failed';
-    self.postMessage({ type: 'ERROR', message });
+    self.postMessage({ type: 'QUERY_ERROR', message });
   }
 }
 
@@ -270,7 +290,7 @@ async function extractJSON(schema: string, userInput: string): Promise<void> {
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : 'JSON extraction failed';
-    self.postMessage({ type: 'ERROR', message });
+    self.postMessage({ type: 'JSON_ERROR', message });
   }
 }
 

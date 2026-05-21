@@ -17,12 +17,12 @@ export interface AIState {
 
 interface QueryResolver {
   resolve: (code: string) => void;
-  reject: (reason: string) => void;
+  reject: (reason: unknown) => void;
 }
 
 interface JSONResolver {
   resolve: (data: Record<string, string>) => void;
-  reject: (reason: string) => void;
+  reject: (reason: unknown) => void;
 }
 
 interface WebGPUAIContextValue extends AIState {
@@ -36,7 +36,9 @@ type WorkerMessage =
   | { type: 'READY' }
   | { type: 'QUERY_RESULT'; code: string }
   | { type: 'JSON_RESULT'; data: Record<string, string> }
-  | { type: 'ERROR'; message: string };
+  | { type: 'ERROR'; message: string }       // init-level: kills AI status
+  | { type: 'QUERY_ERROR'; message: string } // query-level: AI stays ready
+  | { type: 'JSON_ERROR'; message: string };  // json-level: AI stays ready
 
 export interface WebGPUAIProviderProps {
   children: ReactNode;
@@ -111,23 +113,39 @@ export function WebGPUAIProvider({ children, serverFallbackUrl }: WebGPUAIProvid
           }
           break;
 
+        case 'QUERY_ERROR': {
+          // Query-level failure — AI model stays ready, only this request fails
+          if (pendingQueryRef.current) {
+            pendingQueryRef.current.reject(new Error(msg.message));
+            pendingQueryRef.current = null;
+          }
+          break;
+        }
+
+        case 'JSON_ERROR': {
+          if (pendingJSONRef.current) {
+            pendingJSONRef.current.reject(new Error(msg.message));
+            pendingJSONRef.current = null;
+          }
+          break;
+        }
+
         case 'ERROR': {
+          // Init-level failure — AI cannot recover, set status to error
           const fallbackUrl = serverFallbackUrlRef.current;
           if (fallbackUrl) {
-            // Worker/model failed — switch to server fallback mode
             setAiState({
               status: 'ready',
               progress: 100,
               error: null,
               mode: 'server',
             });
-            // Resolve any pending promises as empty (they will re-route via server)
             if (pendingQueryRef.current) {
-              pendingQueryRef.current.reject(msg.message);
+              pendingQueryRef.current.reject(new Error(msg.message));
               pendingQueryRef.current = null;
             }
             if (pendingJSONRef.current) {
-              pendingJSONRef.current.reject(msg.message);
+              pendingJSONRef.current.reject(new Error(msg.message));
               pendingJSONRef.current = null;
             }
           } else {
@@ -137,11 +155,11 @@ export function WebGPUAIProvider({ children, serverFallbackUrl }: WebGPUAIProvid
               error: msg.message,
             }));
             if (pendingQueryRef.current) {
-              pendingQueryRef.current.reject(msg.message);
+              pendingQueryRef.current.reject(new Error(msg.message));
               pendingQueryRef.current = null;
             }
             if (pendingJSONRef.current) {
-              pendingJSONRef.current.reject(msg.message);
+              pendingJSONRef.current.reject(new Error(msg.message));
               pendingJSONRef.current = null;
             }
           }
@@ -159,11 +177,11 @@ export function WebGPUAIProvider({ children, serverFallbackUrl }: WebGPUAIProvid
         setAiState({ status: 'error', progress: 0, error: message, mode: null });
       }
       if (pendingQueryRef.current) {
-        pendingQueryRef.current.reject(message);
+        pendingQueryRef.current.reject(new Error(message));
         pendingQueryRef.current = null;
       }
       if (pendingJSONRef.current) {
-        pendingJSONRef.current.reject(message);
+        pendingJSONRef.current.reject(new Error(message));
         pendingJSONRef.current = null;
       }
     };
