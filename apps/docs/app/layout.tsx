@@ -9,7 +9,19 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* Prevent flash of wrong theme before React hydrates */}
+        <script dangerouslySetInnerHTML={{ __html: `
+          (function(){
+            try {
+              var s = localStorage.getItem('lg-theme');
+              var p = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+              document.documentElement.setAttribute('data-theme', s || p);
+            } catch(e) {}
+          })();
+        `}} />
+      </head>
       <body suppressHydrationWarning>{children}</body>
     </html>
   );

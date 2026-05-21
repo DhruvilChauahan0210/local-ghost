@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import ProjectStats from './ProjectStats';
+import ThemeToggle from './ThemeToggle';
 
 const TERMINAL_LINES = [
   { query: 'who earns the most?',                  result: 'Grace Kim — $210,000',    type: 'stat' },
@@ -70,6 +72,7 @@ export default function HomePage() {
           <a href="https://www.npmjs.com/package/@dhruvil0210/local-ghost" className="nav-link" target="_blank" rel="noreferrer">[ npm ]</a>
           <a href="https://github.com/DhruvilChauahan0210/local-ghost" className="nav-link" target="_blank" rel="noreferrer">[ GitHub ]</a>
           <a href="http://localhost:5173" className="nav-link accent">[ Live Demo ]</a>
+          <ThemeToggle />
         </div>
       </nav>
 
@@ -151,6 +154,10 @@ export default function HomePage() {
             <a href="https://github.com/DhruvilChauahan0210/local-ghost" className="btn btn-secondary" target="_blank" rel="noreferrer">VIEW SOURCE</a>
           </div>
         </section>
+
+        {/* ── LIVE PROJECT STATS ── */}
+        <div className="section-divider"><span>// LIVE PROJECT STATS</span></div>
+        <ProjectStats />
 
         {/* ── WHAT'S NEW v1.2.0 ── */}
         <div className="section-divider"><span>// WHAT'S NEW IN v1.2.0</span></div>
