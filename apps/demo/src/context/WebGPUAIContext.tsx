@@ -12,14 +12,27 @@ export interface AIState {
 }
 
 export interface AnalysisResult {
-  action: 'chart' | 'filter';
+  action: 'chart' | 'filter' | 'table' | 'stat';
+  // chart
   type?: 'bar' | 'line' | 'pie' | 'scatter';
   xKey?: string;
   yKey?: string;
   aggregation?: 'count' | 'avg' | 'sum' | 'max' | 'min';
+  // filter
   field?: string;
   op?: '>' | '<' | '=' | 'contains';
   value?: string | number;
+  // table
+  sortBy?: string;
+  sortDir?: 'asc' | 'desc';
+  limit?: number;
+  filterField?: string;
+  filterOp?: '>' | '<' | '=' | 'contains';
+  filterValue?: string | number;
+  // stat
+  metric?: 'count' | 'avg' | 'sum' | 'max' | 'min';
+  // shared
+  label?: string;
   title?: string;
 }
 

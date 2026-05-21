@@ -256,26 +256,38 @@ async function extractJSON(schema: string, userInput: string): Promise<void> {
 // ── SmartAnalytics ────────────────────────────────────────────────────────────
 const ANALYZE_PROMPT = `You are a data analysis AI. Dataset columns: {SCHEMA}
 
-Decide if the user wants a CHART (aggregate/visualize), SCATTER (plot two numeric fields), or a FILTER (list matching rows), then output ONLY valid JSON.
+Pick the BEST action for the query and output ONLY a valid JSON object. No explanation, no markdown.
 
-CHART examples: "average salary by role", "count by city", "salary distribution pie"
-SCATTER examples: "scatter age vs salary", "plot salary against age", "make scatter chart", "age salary scatter"
-FILTER examples: "employees with salary more than 100000", "show engineers", "list people older than 35"
-
-For CHART output exactly this shape:
-{"action":"chart","type":"bar","xKey":"role","yKey":"salary","aggregation":"avg","title":"Average Salary by Role"}
-
-For SCATTER output exactly this shape:
+─── CHART ── visual graph (compare, distribution, by group, over time)
+{"action":"chart","type":"bar","xKey":"role","yKey":"salary","aggregation":"avg","title":"Avg Salary by Role"}
+{"action":"chart","type":"pie","xKey":"city","aggregation":"count","title":"Employees by City"}
+{"action":"chart","type":"line","xKey":"age","yKey":"salary","aggregation":"avg","title":"Salary by Age"}
 {"action":"chart","type":"scatter","xKey":"age","yKey":"salary","title":"Age vs Salary"}
 
-For FILTER output exactly this shape:
-{"action":"filter","field":"salary","op":">","value":100000,"title":"Employees with salary over 100k"}
+─── TABLE ── list, rank, sort, top N, show all
+{"action":"table","sortBy":"salary","sortDir":"desc","limit":5,"title":"Top 5 Earners"}
+{"action":"table","sortBy":"age","sortDir":"asc","title":"Employees by Age"}
+{"action":"table","filterField":"role","filterOp":"contains","filterValue":"engineer","title":"Engineers"}
+{"action":"table","sortBy":"salary","sortDir":"desc","title":"Ranked by Salary"}
 
-Valid type values: bar, line, pie, scatter
-Valid aggregation values: count, avg, sum, max, min (not used for scatter)
-Valid op values: >, <, =, contains
+─── STAT ── single number answer (how many, average, total, highest, lowest, who)
+{"action":"stat","metric":"count","label":"Total Employees"}
+{"action":"stat","metric":"avg","field":"salary","label":"Average Salary"}
+{"action":"stat","metric":"max","field":"salary","label":"Highest Salary"}
+{"action":"stat","metric":"min","field":"age","label":"Youngest Employee"}
+{"action":"stat","metric":"sum","field":"salary","label":"Total Payroll"}
 
-Output ONLY the JSON object. No other text.`;
+─── FILTER ── show rows matching a condition
+{"action":"filter","field":"salary","op":">","value":100000,"title":"Salary Over 100k"}
+{"action":"filter","field":"city","op":"=","value":"New York","title":"New York Employees"}
+
+Valid chart types: bar, line, pie, scatter
+Valid aggregations: count, avg, sum, max, min
+Valid metrics: count, avg, sum, max, min
+Valid sortDir: asc, desc
+Valid filterOp / op: >, <, =, contains
+
+Output ONLY the JSON object.`;
 
 async function analyzeData(schema: string, userInput: string): Promise<void> {
   if (!generator) { self.postMessage({ type: 'ANALYSIS_ERROR', message: 'Model not ready' }); return; }
@@ -295,11 +307,21 @@ async function analyzeData(schema: string, userInput: string): Promise<void> {
       const result = JSON.parse(jsonMatch[0]) as Record<string, unknown>;
       // Normalize: model sometimes omits "action" when type is obvious
       const CHART_TYPES = ['bar', 'line', 'pie', 'scatter'];
+      const VALID_ACTIONS = ['chart', 'filter', 'table', 'stat'];
+      // Normalize: if action missing but type looks like a chart, default to chart
       if (!result['action'] && CHART_TYPES.includes(String(result['type']))) {
         result['action'] = 'chart';
       }
-      if (result['action'] !== 'chart' && result['action'] !== 'filter') {
-        self.postMessage({ type: 'ANALYSIS_ERROR', message: 'AI returned an unrecognized response. Try: "average salary by role", "scatter age vs salary", or "show engineers".' });
+      // Normalize: if action missing but metric present, default to stat
+      if (!result['action'] && result['metric']) {
+        result['action'] = 'stat';
+      }
+      // Normalize: if action missing but sortBy present, default to table
+      if (!result['action'] && result['sortBy']) {
+        result['action'] = 'table';
+      }
+      if (!VALID_ACTIONS.includes(String(result['action']))) {
+        self.postMessage({ type: 'ANALYSIS_ERROR', message: 'Try: "average salary by role", "top 5 earners", "scatter age vs salary", "who earns the most", or "show engineers".' });
         return;
       }
       self.postMessage({ type: 'ANALYSIS_RESULT', result });
