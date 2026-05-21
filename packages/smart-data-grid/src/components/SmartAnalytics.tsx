@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import {
   BarChart,
   Bar,
@@ -188,32 +188,44 @@ function renderChart(config: ChartConfig, data: Record<string, unknown>[]) {
   return null;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnySpeechRecognition = any;
+
+function getSpeechRecognition(): (new () => AnySpeechRecognition) | null {
+  if (typeof window === 'undefined') return null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const w = window as any;
+  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
+}
+
 export function SmartAnalytics({ data, className = '' }: SmartAnalyticsProps) {
   const ai = useWebGPUAI();
   const [query, setQuery] = useState('');
   const [chartConfig, setChartConfig] = useState<ChartConfig | null>(null);
   const [chartStatus, setChartStatus] = useState<ChartStatus>('idle');
   const [chartError, setChartError] = useState<string | null>(null);
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef<AnySpeechRecognition | null>(null);
 
   const columns = data.length > 0 ? Object.keys(data[0]) : [];
 
-  const handleGenerateChart = useCallback(async () => {
-    if (!query.trim() || ai.status !== 'ready') return;
+  const handleGenerateChart = useCallback(async (overrideQuery?: string) => {
+    const q = (overrideQuery ?? query).trim();
+    if (!q || ai.status !== 'ready') return;
 
     setChartStatus('running');
     setChartError(null);
 
     const schema = columns.join(', ');
-    const userInput = `Generate a chart config JSON for: "${query}". Return ONLY: {"type":"bar"|"line"|"pie","xKey":"fieldName","yKey":"fieldName","title":"chart title"}`;
+    const userInput = `Generate a chart config JSON for: "${q}". Return ONLY: {"type":"bar"|"line"|"pie","xKey":"fieldName","yKey":"fieldName","title":"chart title"}`;
 
     try {
       const config = await ai.extractJSON(schema, userInput);
 
-      // Validate the extracted config
       const type = config['type'];
       const xKey = config['xKey'];
       const yKey = config['yKey'];
-      const title = config['title'] ?? query;
+      const title = config['title'] ?? q;
 
       if (!type || !xKey || !yKey) {
         throw new Error('AI returned an incomplete chart configuration. Try a more specific query.');
@@ -249,6 +261,49 @@ export function SmartAnalytics({ data, className = '' }: SmartAnalyticsProps) {
     [handleGenerateChart]
   );
 
+  const handleVoiceToggle = useCallback(() => {
+    const SpeechRecognition = getSpeechRecognition();
+    if (!SpeechRecognition) return;
+
+    if (isListening && recognitionRef.current) {
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+      setIsListening(false);
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => setIsListening(true);
+
+    recognition.onresult = (event: { results: { transcript: string }[][] }) => {
+      const transcript = event.results[0][0].transcript;
+      setQuery(transcript);
+      setIsListening(false);
+      recognitionRef.current = null;
+      // Auto-trigger chart generation after voice capture
+      void handleGenerateChart(transcript);
+    };
+
+    recognition.onerror = () => {
+      setIsListening(false);
+      recognitionRef.current = null;
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+      recognitionRef.current = null;
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+  }, [isListening, handleGenerateChart]);
+
+  const speechSupported = getSpeechRecognition() !== null;
+
   return (
     <div className={className}>
       {/* Command Bar */}
@@ -283,16 +338,53 @@ export function SmartAnalytics({ data, className = '' }: SmartAnalyticsProps) {
         )}
 
         <div className="flex gap-2">
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder='e.g. "show salary distribution by role"'
-            disabled={ai.status !== 'ready' || chartStatus === 'running'}
-            className="flex-1 rounded-lg border border-slate-700 bg-slate-800/60 px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 outline-none transition-all focus:border-indigo-500/70 focus:ring-2 focus:ring-indigo-500/20 disabled:cursor-not-allowed disabled:opacity-50"
-            aria-label="Natural language chart query"
-          />
+          <div className="relative flex-1">
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder='e.g. "show salary distribution by role"'
+              disabled={ai.status !== 'ready' || chartStatus === 'running'}
+              className="w-full rounded-lg border border-slate-700 bg-slate-800/60 px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 outline-none transition-all focus:border-indigo-500/70 focus:ring-2 focus:ring-indigo-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+              aria-label="Natural language chart query"
+            />
+            {/* Listening pulse indicator inside the input */}
+            {isListening && (
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
+              </span>
+            )}
+          </div>
+
+          {/* Voice input button */}
+          {speechSupported && (
+            <button
+              onClick={handleVoiceToggle}
+              disabled={ai.status !== 'ready' || chartStatus === 'running'}
+              title={isListening ? 'Stop listening' : 'Speak your chart query'}
+              className={`flex items-center justify-center rounded-lg border px-3 py-2.5 transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 ${
+                isListening
+                  ? 'border-red-500/60 bg-red-500/15 text-red-400 hover:bg-red-500/25'
+                  : 'border-slate-600 bg-slate-700/50 text-slate-300 hover:bg-slate-700'
+              }`}
+              aria-label={isListening ? 'Stop voice input' : 'Start voice input'}
+            >
+              {isListening ? (
+                <svg className="h-4 w-4 animate-pulse" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path d="M7 4a3 3 0 016 0v6a3 3 0 11-6 0V4z" />
+                  <path d="M5.5 9.643a.75.75 0 00-1.5 0V10c0 3.06 2.29 5.585 5.25 5.954V17.5h-1.5a.75.75 0 000 1.5h4.5a.75.75 0 000-1.5H10.5v-1.546A6.001 6.001 0 0016 10v-.357a.75.75 0 00-1.5 0V10a4.5 4.5 0 01-9 0v-.357z" />
+                </svg>
+              ) : (
+                <svg className="h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path d="M7 4a3 3 0 016 0v6a3 3 0 11-6 0V4z" />
+                  <path d="M5.5 9.643a.75.75 0 00-1.5 0V10c0 3.06 2.29 5.585 5.25 5.954V17.5h-1.5a.75.75 0 000 1.5h4.5a.75.75 0 000-1.5H10.5v-1.546A6.001 6.001 0 0016 10v-.357a.75.75 0 00-1.5 0V10a4.5 4.5 0 01-9 0v-.357z" />
+                </svg>
+              )}
+            </button>
+          )}
+
           <button
             onClick={() => void handleGenerateChart()}
             disabled={ai.status !== 'ready' || chartStatus === 'running' || !query.trim()}
@@ -331,6 +423,12 @@ export function SmartAnalytics({ data, className = '' }: SmartAnalyticsProps) {
           )}
         </div>
 
+        {isListening && (
+          <p className="mt-2 text-xs text-red-400 animate-pulse">
+            Listening&hellip; speak your chart query now.
+          </p>
+        )}
+
         {chartStatus === 'error' && chartError && (
           <div className="mt-3 flex items-start gap-2 rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2.5 text-xs text-red-300">
             <svg className="mt-0.5 h-3.5 w-3.5 shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -365,7 +463,10 @@ export function SmartAnalytics({ data, className = '' }: SmartAnalyticsProps) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
           </svg>
           <p className="text-sm text-slate-500">Describe a chart in plain English to visualize your data</p>
-          <p className="mt-1 text-xs text-slate-600">e.g. "show average salary per role" or "count employees by city"</p>
+          <p className="mt-1 text-xs text-slate-600">
+            e.g. "show average salary per role" or "count employees by city"
+            {speechSupported && ' — or click the mic to speak'}
+          </p>
         </div>
       )}
     </div>

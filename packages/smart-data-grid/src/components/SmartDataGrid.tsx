@@ -1,11 +1,27 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useWebGPUAI } from '../hooks/useWebGPUAI';
+import { safelyExecuteGeneratedCode } from '../utils/sandbox';
 
 interface SmartDataGridProps {
   data: Record<string, unknown>[];
 }
 
 type QueryStatus = 'idle' | 'running' | 'error';
+
+// Inject row animation keyframes once per document
+let _styleInjected = false;
+function ensureAnimationStyles() {
+  if (_styleInjected || typeof document === 'undefined') return;
+  _styleInjected = true;
+  const el = document.createElement('style');
+  el.textContent = `
+    @keyframes lgRowIn {
+      from { opacity: 0; transform: translateY(5px); }
+      to   { opacity: 1; transform: translateY(0);   }
+    }
+  `;
+  document.head.appendChild(el);
+}
 
 function AIStatusBadge({
   status,
@@ -113,7 +129,13 @@ export function SmartDataGrid({ data }: SmartDataGridProps) {
   const [displayData, setDisplayData] = useState<Record<string, unknown>[]>(data);
   const [queryStatus, setQueryStatus] = useState<QueryStatus>('idle');
   const [queryError, setQueryError] = useState<string | null>(null);
+  // Incremented on each successful filter to trigger row re-mount animation
+  const [filterKey, setFilterKey] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    ensureAnimationStyles();
+  }, []);
 
   const columns = data.length > 0 ? Object.keys(data[0]) : [];
 
@@ -128,15 +150,14 @@ export function SmartDataGrid({ data }: SmartDataGridProps) {
     try {
       const code = await ai.runQuery(schema, query.trim());
 
-      // Isolated sandbox: new Function scope, no access to globals
-      const sandbox = new Function('data', `return (${code})(data)`);
-      const result = sandbox(data) as unknown;
+      const result = safelyExecuteGeneratedCode(code, data);
 
-      if (!Array.isArray(result)) {
-        throw new TypeError('AI returned code that did not produce an array');
+      if (result === null) {
+        throw new Error('Generated code was blocked by the security sandbox or failed to execute');
       }
 
-      setDisplayData(result as Record<string, unknown>[]);
+      setDisplayData(result);
+      setFilterKey((k) => k + 1);
       setQueryStatus('idle');
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unknown error';
@@ -150,6 +171,7 @@ export function SmartDataGrid({ data }: SmartDataGridProps) {
     setQuery('');
     setQueryStatus('idle');
     setQueryError(null);
+    setFilterKey((k) => k + 1);
     inputRef.current?.focus();
   }, [data]);
 
@@ -429,7 +451,12 @@ export function SmartDataGrid({ data }: SmartDataGridProps) {
               ) : (
                 displayData.map((row, rowIndex) => (
                   <tr
-                    key={rowIndex}
+                    key={`${filterKey}-${rowIndex}`}
+                    style={{
+                      animation: 'lgRowIn 0.2s ease forwards',
+                      animationDelay: `${Math.min(rowIndex * 18, 280)}ms`,
+                      opacity: 0,
+                    }}
                     className={
                       rowIndex % 2 === 0
                         ? 'bg-transparent hover:bg-slate-800/40 transition-colors'
