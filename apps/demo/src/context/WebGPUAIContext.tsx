@@ -9,6 +9,7 @@ export interface AIState {
   error: string | null;
   mode: 'webgpu' | 'wasm' | 'server' | null;
   systemLogs: string[];
+  isProcessing: boolean; // true while any query/json/analysis request is in-flight
 }
 
 export interface AnalysisResult {
@@ -52,7 +53,7 @@ type WorkerMessage =
   | { type: 'JSON_RESULT';     data: Record<string, string> }
   | { type: 'ANALYSIS_RESULT'; result: AnalysisResult }
   | { type: 'LOG';             message: string }
-  | { type: 'SYSTEM_STATUS';   status: 'disposed' | 'active' }
+  | { type: 'SYSTEM_STATUS';   status: 'disposed' | 'active' | 'hotswap' }
   | { type: 'ERROR';           message: string }          // init-level — kills AI status
   | { type: 'QUERY_ERROR';     message: string }          // query-level — AI stays ready
   | { type: 'JSON_ERROR';      message: string }          // json-level — AI stays ready
@@ -70,7 +71,7 @@ const WebGPUAIContext = createContext<WebGPUAIContextValue | null>(null);
 
 export function WebGPUAIProvider({ children, serverFallbackUrl }: WebGPUAIProviderProps) {
   const [aiState, setAiState] = useState<AIState>({
-    status: 'uninitialized', progress: 0, error: null, mode: null, systemLogs: [],
+    status: 'uninitialized', progress: 0, error: null, mode: null, systemLogs: [], isProcessing: false,
   });
 
   const workerRef      = useRef<Worker | null>(null);
@@ -80,10 +81,14 @@ export function WebGPUAIProvider({ children, serverFallbackUrl }: WebGPUAIProvid
   const fallbackUrlRef = useRef(serverFallbackUrl);
   fallbackUrlRef.current = serverFallbackUrl;
 
+  const setProcessing = (v: boolean) =>
+    setAiState(p => ({ ...p, isProcessing: v }));
+
   const rejectAll = (err: Error) => {
     queryRef.current?.reject(err);    queryRef.current = null;
     jsonRef.current?.reject(err);     jsonRef.current = null;
     analysisRef.current?.reject(err); analysisRef.current = null;
+    setProcessing(false);
   };
 
   const initAI = useCallback(() => {
@@ -106,9 +111,10 @@ export function WebGPUAIProvider({ children, serverFallbackUrl }: WebGPUAIProvid
 
         case 'READY':
           setAiState(p => ({
-            ...p, status: 'ready', progress: 100, error: null,
-            mode: hasWebGPU ? 'webgpu' : 'wasm',
-            systemLogs: addLog(p.systemLogs, '[LG_SYSTEM] Local Ghost is active. System running on native hardware.'),
+            ...p, status: 'ready', progress: 100, error: null, isProcessing: false,
+            // Use device reported by worker — could be 'wasm' after a hotswap
+            mode: (msg.device === 'wasm' ? 'wasm' : hasWebGPU ? 'webgpu' : 'wasm'),
+            systemLogs: addLog(p.systemLogs, `[LG_SYSTEM] Local Ghost is active. Running on ${(msg.device ?? (hasWebGPU ? 'webgpu' : 'wasm')).toUpperCase()}.`),
           }));
           break;
 
@@ -130,8 +136,14 @@ export function WebGPUAIProvider({ children, serverFallbackUrl }: WebGPUAIProvid
         case 'SYSTEM_STATUS':
           if (msg.status === 'disposed') {
             setAiState(p => ({
-              ...p, status: 'disposed', mode: null, progress: 0,
+              ...p, status: 'disposed', mode: null, progress: 0, isProcessing: false,
               systemLogs: addLog(p.systemLogs, '[LG_SYSTEM] VRAM purged — 5 min idle. Click Enable AI to reload.'),
+            }));
+          } else if (msg.status === 'hotswap') {
+            // GPU context was lost — worker is reinitialising on WASM; show loading bar
+            setAiState(p => ({
+              ...p, status: 'loading', progress: 0, mode: null, isProcessing: false,
+              systemLogs: addLog(p.systemLogs, '[LG_HARDENING] WebGPU context lost. Hot-swapping to WASM...'),
             }));
           }
           break;
@@ -140,16 +152,19 @@ export function WebGPUAIProvider({ children, serverFallbackUrl }: WebGPUAIProvid
         case 'QUERY_ERROR':
           queryRef.current?.reject(new Error(msg.message));
           queryRef.current = null;
+          setProcessing(false);
           break;
 
         case 'JSON_ERROR':
           jsonRef.current?.reject(new Error(msg.message));
           jsonRef.current = null;
+          setProcessing(false);
           break;
 
         case 'ANALYSIS_ERROR':
           analysisRef.current?.reject(new Error(msg.message));
           analysisRef.current = null;
+          setProcessing(false);
           break;
 
         // Init-level failure — AI cannot recover
@@ -170,22 +185,23 @@ export function WebGPUAIProvider({ children, serverFallbackUrl }: WebGPUAIProvid
       const message = e.message ?? 'Worker error';
       const err = new Error(message);
       if (fallbackUrlRef.current) {
-        setAiState(p => ({ ...p, status: 'ready', progress: 100, error: null, mode: 'server' }));
+        setAiState(p => ({ ...p, status: 'ready', progress: 100, error: null, mode: 'server', isProcessing: false }));
       } else {
-        setAiState({ status: 'error', progress: 0, error: message, mode: null, systemLogs: [] });
+        setAiState({ status: 'error', progress: 0, error: message, mode: null, systemLogs: [], isProcessing: false });
       }
       rejectAll(err);
     };
 
-    setAiState(p => ({ ...p, status: 'loading', progress: 0, error: null, systemLogs: [] }));
+    setAiState(p => ({ ...p, status: 'loading', progress: 0, error: null, systemLogs: [], isProcessing: false }));
     worker.postMessage({ type: 'INIT' });
   }, [aiState.status]);
 
   useEffect(() => () => { workerRef.current?.terminate(); workerRef.current = null; }, []);
 
-  // ── runQuery with IndexedDB cache ─────────────────────────────────────────
+  // ── runQuery with IndexedDB cache + concurrency lock ─────────────────────
   const runQuery = useCallback((schema: string, userInput: string) =>
     new Promise<{ code: string; usedFallback: boolean }>(async (resolve, reject) => {
+      // Cache check bypasses the lock — 0ms responses are always safe
       const key = cacheKey(userInput, schema);
       const cached = await getCached<{ code: string; usedFallback: boolean }>(key);
       if (cached) {
@@ -194,15 +210,20 @@ export function WebGPUAIProvider({ children, serverFallbackUrl }: WebGPUAIProvid
         return;
       }
       if (!workerRef.current) { reject(new Error('AI not initialized')); return; }
-      if (queryRef.current)   { reject(new Error('Query already in progress')); return; }
+      // Transaction lock: silently drop if another request is already in-flight
+      if (queryRef.current) {
+        reject(new Error('A query is already in progress — please wait'));
+        return;
+      }
+      setProcessing(true);
       queryRef.current = {
-        resolve: async (result) => { await setCached(key, result); resolve(result); },
-        reject,
+        resolve: async (result) => { setProcessing(false); await setCached(key, result); resolve(result); },
+        reject: (err) => { setProcessing(false); reject(err); },
       };
       workerRef.current.postMessage({ type: 'RUN_QUERY', schema, userInput });
     }), []);
 
-  // ── extractJSON with cache ────────────────────────────────────────────────
+  // ── extractJSON with cache + concurrency lock ─────────────────────────────
   const extractJSON = useCallback((schema: string, userInput: string) =>
     new Promise<Record<string, string>>(async (resolve, reject) => {
       const key = cacheKey(userInput, schema);
@@ -213,15 +234,16 @@ export function WebGPUAIProvider({ children, serverFallbackUrl }: WebGPUAIProvid
         return;
       }
       if (!workerRef.current) { reject(new Error('AI not initialized')); return; }
-      if (jsonRef.current)    { reject(new Error('Extraction already in progress')); return; }
+      if (jsonRef.current) { reject(new Error('Extraction already in progress')); return; }
+      setProcessing(true);
       jsonRef.current = {
-        resolve: async (result) => { await setCached(key, result); resolve(result); },
-        reject,
+        resolve: async (result) => { setProcessing(false); await setCached(key, result); resolve(result); },
+        reject: (err) => { setProcessing(false); reject(err); },
       };
       workerRef.current.postMessage({ type: 'EXTRACT_JSON', schema, userInput });
     }), []);
 
-  // ── analyzeData with cache ────────────────────────────────────────────────
+  // ── analyzeData with cache + concurrency lock ─────────────────────────────
   const analyzeData = useCallback((schema: string, userInput: string) =>
     new Promise<AnalysisResult>(async (resolve, reject) => {
       const key = cacheKey(userInput, schema);
@@ -233,9 +255,10 @@ export function WebGPUAIProvider({ children, serverFallbackUrl }: WebGPUAIProvid
       }
       if (!workerRef.current)  { reject(new Error('AI not initialized')); return; }
       if (analysisRef.current) { reject(new Error('Analysis already in progress')); return; }
+      setProcessing(true);
       analysisRef.current = {
-        resolve: async (result) => { await setCached(key, result); resolve(result); },
-        reject,
+        resolve: async (result) => { setProcessing(false); await setCached(key, result); resolve(result); },
+        reject: (err) => { setProcessing(false); reject(err); },
       };
       workerRef.current.postMessage({ type: 'ANALYZE_DATA', schema, userInput });
     }), []);

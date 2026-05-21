@@ -27,6 +27,10 @@ type IncomingMessage =
 let generator: TextGenerationPipeline | null = null;
 const MODEL_ID = 'onnx-community/Qwen2.5-Coder-0.5B-Instruct';
 
+// Hold our own GPUDevice handle so we can listen for context loss events
+type GPUDeviceLike = { lost: Promise<{ message: string; reason?: string }>; destroy?: () => void };
+let glDevice: GPUDeviceLike | null = null;
+
 // ── VRAM idle timer — disposes model after 5 min of inactivity ───────────────
 const IDLE_MS = 5 * 60 * 1000;
 let idleTimer: ReturnType<typeof setTimeout> | null = null;
@@ -48,9 +52,42 @@ function log(msg: string): void {
   self.postMessage({ type: 'LOG', message: `[LG_SYSTEM] ${msg}` });
 }
 
+// ── WebGPU device-lost hot-swap ───────────────────────────────────────────────
+async function handleDeviceLost(info: { message: string }): Promise<void> {
+  log(`WebGPU context lost: ${info.message}. Hot-swapping to WASM...`);
+  self.postMessage({ type: 'SYSTEM_STATUS', status: 'hotswap' });
+
+  if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
+  if (generator && typeof generator.dispose === 'function') {
+    try { await generator.dispose(); } catch { /* ignore — device already gone */ }
+  }
+  generator = null;
+  glDevice   = null;
+
+  // Re-initialise on WASM — no GPU, no device-lost re-registration needed
+  let lastFile = '';
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const cb = (p: any) => {
+    self.postMessage({ type: 'PROGRESS', progress: Math.round(p.progress ?? 0) });
+    if (p.status === 'initiate' && p.file !== lastFile) { lastFile = p.file ?? ''; log(`Loading: ${lastFile}`); }
+  };
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    generator = await pipeline('text-generation', MODEL_ID, { device: 'wasm', dtype: 'q8', progress_callback: cb as any });
+    log('Hot-swap complete. Running on WASM.');
+    self.postMessage({ type: 'READY', device: 'wasm' });
+    resetIdleTimer();
+  } catch (e) {
+    self.postMessage({ type: 'ERROR', message: e instanceof Error ? e.message : 'WASM fallback failed after device loss' });
+  }
+}
+
 // ── Model init ────────────────────────────────────────────────────────────────
 async function initModel(): Promise<void> {
-  const nav = navigator as Navigator & { gpu?: { requestAdapter: () => Promise<unknown> } };
+  // Extended GPU type to access requestDevice and device.lost
+  type GPUAdapter = { requestDevice: () => Promise<GPUDeviceLike> };
+  type GPUNav     = Navigator & { gpu?: { requestAdapter: (o?: unknown) => Promise<GPUAdapter | null> } };
+  const nav       = navigator as GPUNav;
   const hasWebGPU = !!nav.gpu && !!(await nav.gpu.requestAdapter().catch(() => null));
 
   log(`Initializing Web Worker core... SUCCESS`);
@@ -71,8 +108,23 @@ async function initModel(): Promise<void> {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const tryInit = async (device: 'webgpu' | 'wasm', dtype: any) => {
-    if (device === 'webgpu') log(`Allocating WebGPU command buffers and VRAM shaders...`);
-    else                     log(`Starting WASM inference engine (WebGPU unavailable)...`);
+    if (device === 'webgpu') {
+      log(`Allocating WebGPU command buffers and VRAM shaders...`);
+      // Acquire our own GPUDevice handle to monitor for context loss
+      try {
+        const adapter = await nav.gpu!.requestAdapter();
+        if (adapter) {
+          glDevice = await adapter.requestDevice();
+          // Non-blocking: when GPU is lost (OS sleep, VRAM spike, tab freeze)
+          // hot-swap to WASM so inference continues without user-visible errors
+          glDevice.lost.then((info) => void handleDeviceLost(info));
+        }
+      } catch {
+        // Device acquisition failed — pipeline still initialises, just no lost listener
+      }
+    } else {
+      log(`Starting WASM inference engine (WebGPU unavailable)...`);
+    }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     generator = await pipeline('text-generation', MODEL_ID, { device, dtype, progress_callback: cb as any });
     log(`Local Ghost is active. Running on ${device.toUpperCase()}.`);

@@ -8,6 +8,7 @@ export interface AIState {
   error: string | null;
   mode: 'webgpu' | 'wasm' | 'server' | null;
   systemLogs: string[];
+  isProcessing: boolean;
 }
 
 export interface AnalysisResult {
@@ -51,7 +52,7 @@ type WorkerMessage =
   | { type: 'JSON_RESULT';     data: Record<string, string> }
   | { type: 'ANALYSIS_RESULT'; result: AnalysisResult }
   | { type: 'LOG';             message: string }
-  | { type: 'SYSTEM_STATUS';   status: 'disposed' | 'active' }
+  | { type: 'SYSTEM_STATUS';   status: 'disposed' | 'active' | 'hotswap' }
   | { type: 'ERROR';           message: string }
   | { type: 'QUERY_ERROR';     message: string }
   | { type: 'JSON_ERROR';      message: string }
@@ -69,7 +70,7 @@ const WebGPUAIContext = createContext<WebGPUAIContextValue | null>(null);
 
 export function WebGPUAIProvider({ children, serverFallbackUrl }: WebGPUAIProviderProps) {
   const [aiState, setAiState] = useState<AIState>({
-    status: 'uninitialized', progress: 0, error: null, mode: null, systemLogs: [],
+    status: 'uninitialized', progress: 0, error: null, mode: null, systemLogs: [], isProcessing: false,
   });
 
   const workerRef      = useRef<Worker | null>(null);
@@ -79,10 +80,13 @@ export function WebGPUAIProvider({ children, serverFallbackUrl }: WebGPUAIProvid
   const fallbackUrlRef = useRef(serverFallbackUrl);
   fallbackUrlRef.current = serverFallbackUrl;
 
+  const setProcessing = (v: boolean) => setAiState(p => ({ ...p, isProcessing: v }));
+
   const rejectAll = (err: Error) => {
     queryRef.current?.reject(err);    queryRef.current = null;
     jsonRef.current?.reject(err);     jsonRef.current = null;
     analysisRef.current?.reject(err); analysisRef.current = null;
+    setProcessing(false);
   };
 
   const initAI = useCallback(() => {
@@ -102,9 +106,9 @@ export function WebGPUAIProvider({ children, serverFallbackUrl }: WebGPUAIProvid
           break;
         case 'READY':
           setAiState(p => ({
-            ...p, status: 'ready', progress: 100, error: null,
-            mode: hasWebGPU ? 'webgpu' : 'wasm',
-            systemLogs: addLog(p.systemLogs, '[LG_SYSTEM] Local Ghost is active. System running on native hardware.'),
+            ...p, status: 'ready', progress: 100, error: null, isProcessing: false,
+            mode: msg.device === 'wasm' ? 'wasm' : hasWebGPU ? 'webgpu' : 'wasm',
+            systemLogs: addLog(p.systemLogs, `[LG_SYSTEM] Local Ghost is active. Running on ${(msg.device ?? (hasWebGPU ? 'webgpu' : 'wasm')).toUpperCase()}.`),
           }));
           break;
         case 'QUERY_RESULT':
@@ -122,17 +126,22 @@ export function WebGPUAIProvider({ children, serverFallbackUrl }: WebGPUAIProvid
         case 'SYSTEM_STATUS':
           if (msg.status === 'disposed') {
             setAiState(p => ({
-              ...p, status: 'disposed', mode: null, progress: 0,
+              ...p, status: 'disposed', mode: null, progress: 0, isProcessing: false,
               systemLogs: addLog(p.systemLogs, '[LG_SYSTEM] VRAM purged — 5 min idle.'),
+            }));
+          } else if (msg.status === 'hotswap') {
+            setAiState(p => ({
+              ...p, status: 'loading', progress: 0, mode: null, isProcessing: false,
+              systemLogs: addLog(p.systemLogs, '[LG_HARDENING] WebGPU context lost. Hot-swapping to WASM...'),
             }));
           }
           break;
         case 'QUERY_ERROR':
-          queryRef.current?.reject(new Error(msg.message)); queryRef.current = null; break;
+          queryRef.current?.reject(new Error(msg.message)); queryRef.current = null; setProcessing(false); break;
         case 'JSON_ERROR':
-          jsonRef.current?.reject(new Error(msg.message)); jsonRef.current = null; break;
+          jsonRef.current?.reject(new Error(msg.message)); jsonRef.current = null; setProcessing(false); break;
         case 'ANALYSIS_ERROR':
-          analysisRef.current?.reject(new Error(msg.message)); analysisRef.current = null; break;
+          analysisRef.current?.reject(new Error(msg.message)); analysisRef.current = null; setProcessing(false); break;
         case 'ERROR': {
           const err = new Error(msg.message);
           if (fallbackUrlRef.current) {
@@ -151,7 +160,7 @@ export function WebGPUAIProvider({ children, serverFallbackUrl }: WebGPUAIProvid
       if (fallbackUrlRef.current) {
         setAiState(p => ({ ...p, status: 'ready', progress: 100, error: null, mode: 'server' }));
       } else {
-        setAiState({ status: 'error', progress: 0, error: message, mode: null, systemLogs: [] });
+        setAiState({ status: 'error', progress: 0, error: message, mode: null, systemLogs: [], isProcessing: false });
       }
       rejectAll(new Error(message));
     };
@@ -166,7 +175,11 @@ export function WebGPUAIProvider({ children, serverFallbackUrl }: WebGPUAIProvid
     new Promise<{ code: string; usedFallback: boolean }>((resolve, reject) => {
       if (!workerRef.current) { reject(new Error('AI not initialized')); return; }
       if (queryRef.current)   { reject(new Error('Query already in progress')); return; }
-      queryRef.current = { resolve, reject };
+      setProcessing(true);
+      queryRef.current = {
+        resolve: (r) => { setProcessing(false); resolve(r); },
+        reject:  (e) => { setProcessing(false); reject(e); },
+      };
       workerRef.current.postMessage({ type: 'RUN_QUERY', schema, userInput });
     }), []);
 
@@ -174,7 +187,11 @@ export function WebGPUAIProvider({ children, serverFallbackUrl }: WebGPUAIProvid
     new Promise<Record<string, string>>((resolve, reject) => {
       if (!workerRef.current) { reject(new Error('AI not initialized')); return; }
       if (jsonRef.current)    { reject(new Error('Extraction already in progress')); return; }
-      jsonRef.current = { resolve, reject };
+      setProcessing(true);
+      jsonRef.current = {
+        resolve: (r) => { setProcessing(false); resolve(r); },
+        reject:  (e) => { setProcessing(false); reject(e); },
+      };
       workerRef.current.postMessage({ type: 'EXTRACT_JSON', schema, userInput });
     }), []);
 
@@ -182,7 +199,11 @@ export function WebGPUAIProvider({ children, serverFallbackUrl }: WebGPUAIProvid
     new Promise<AnalysisResult>((resolve, reject) => {
       if (!workerRef.current)  { reject(new Error('AI not initialized')); return; }
       if (analysisRef.current) { reject(new Error('Analysis already in progress')); return; }
-      analysisRef.current = { resolve, reject };
+      setProcessing(true);
+      analysisRef.current = {
+        resolve: (r) => { setProcessing(false); resolve(r); },
+        reject:  (e) => { setProcessing(false); reject(e); },
+      };
       workerRef.current.postMessage({ type: 'ANALYZE_DATA', schema, userInput });
     }), []);
 
