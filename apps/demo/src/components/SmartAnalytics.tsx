@@ -48,35 +48,53 @@ function fmt(n: number): string {
   return n.toLocaleString();
 }
 
-function executeAnalysis(result: AnalysisResult, data: Record<string, unknown>[]): Execution | null {
+// Infer the best numeric and string fields from actual data values
+function inferFields(data: Record<string, unknown>[]) {
+  if (!data.length) return { numericField: '', stringField: '' };
+  const row = data[0];
+  const NUMERIC_HINTS = ['salary','age','price','amount','cost','revenue','score','value','rate','income','pay','wage'];
+  const STRING_HINTS  = ['name','city','role','department','type','status','country','team','category','title'];
+  const cols = Object.keys(row);
+  const numericField =
+    cols.find(c => NUMERIC_HINTS.some(h => c.toLowerCase().includes(h)) && typeof row[c] === 'number') ??
+    cols.find(c => typeof row[c] === 'number') ?? '';
+  const stringField =
+    cols.find(c => STRING_HINTS.some(h => c.toLowerCase().includes(h)) && typeof row[c] === 'string') ??
+    cols.find(c => typeof row[c] === 'string') ?? '';
+  return { numericField, stringField };
+}
+
+function executeAnalysis(result: AnalysisResult, data: Record<string, unknown>[]): Execution {
+  const { numericField, stringField } = inferFields(data);
 
   // ── STAT ─────────────────────────────────────────────────────────────────────
   if (result.action === 'stat') {
-    const { metric, field } = result;
-    if (!metric) return null;
+    const metric = result.metric ?? 'count';
+    const field  = result.field ?? numericField;
 
-    let value: number;
+    let value = 0;
     let record: Record<string, unknown> | null = null;
 
     if (metric === 'count') {
       value = data.length;
-    } else {
-      if (!field) return null;
+    } else if (field) {
       const nums = data.map(r => ({ val: Number(r[field]), row: r })).filter(x => !isNaN(x.val));
-      if (!nums.length) return null;
-      if (metric === 'avg')  value = Math.round(nums.reduce((a, x) => a + x.val, 0) / nums.length);
-      else if (metric === 'sum') value = nums.reduce((a, x) => a + x.val, 0);
-      else if (metric === 'max') { const m = nums.reduce((a, x) => x.val > a.val ? x : a); value = m.val; record = m.row; }
-      else if (metric === 'min') { const m = nums.reduce((a, x) => x.val < a.val ? x : a); value = m.val; record = m.row; }
-      else value = 0;
+      if (nums.length) {
+        if (metric === 'avg')  value = Math.round(nums.reduce((a, x) => a + x.val, 0) / nums.length);
+        else if (metric === 'sum') value = nums.reduce((a, x) => a + x.val, 0);
+        else if (metric === 'max') { const m = nums.reduce((a, x) => x.val > a.val ? x : a); value = m.val; record = m.row; }
+        else if (metric === 'min') { const m = nums.reduce((a, x) => x.val < a.val ? x : a); value = m.val; record = m.row; }
+      }
     }
 
-    return { kind: 'stat', value, formatted: value.toLocaleString(), record, field: field ?? null };
+    return { kind: 'stat', value, formatted: value.toLocaleString(), record, field: field || null };
   }
 
   // ── TABLE ─────────────────────────────────────────────────────────────────────
   if (result.action === 'table') {
-    const { sortBy, sortDir = 'desc', limit, filterField, filterOp, filterValue } = result;
+    const sortBy  = result.sortBy  ?? numericField;
+    const sortDir = result.sortDir ?? 'desc';
+    const { limit, filterField, filterOp, filterValue } = result;
     let rows = [...data];
 
     if (filterField && filterValue !== undefined) {
@@ -98,53 +116,45 @@ function executeAnalysis(result: AnalysisResult, data: Record<string, unknown>[]
 
   // ── FILTER ───────────────────────────────────────────────────────────────────
   if (result.action === 'filter') {
-    const { field, op, value } = result;
-    const rows = field ? applyFilter(data, field, op, value) : data;
+    const field = result.field ?? stringField;
+    const rows  = field ? applyFilter(data, field, result.op, result.value) : [...data];
     return { kind: 'filter', rows };
   }
 
   // ── CHART ─────────────────────────────────────────────────────────────────────
-  if (result.action === 'chart') {
-    const { xKey, yKey: rawYKey, aggregation = 'count', type } = result;
-    if (!xKey) return null;
+  // (also the final fallback — anything else becomes a chart)
+  const xKey = result.xKey ?? stringField;
+  const rawYKey = result.yKey;
+  const aggregation = result.aggregation ?? 'count';
+  const type = result.type ?? 'bar';
 
-    // Scatter — raw numeric pairs, no aggregation
-    if (type === 'scatter') {
-      const yKey = rawYKey ?? '';
-      if (!yKey) return null;
-      const chartData = data.map(row => ({
-        [xKey]: Number(row[xKey] ?? 0),
-        [yKey]: Number(row[yKey] ?? 0),
-      }));
-      return { kind: 'chart', chartData, yKey };
-    }
-
-    // Aggregated chart (bar, line, pie)
-    const groups: Record<string, number[]> = {};
-    for (const row of data) {
-      const group = String(row[xKey] ?? 'Unknown');
-      if (!groups[group]) groups[group] = [];
-      if (aggregation === 'count') {
-        groups[group].push(1);
-      } else if (rawYKey) {
-        const v = Number(row[rawYKey]);
-        if (!isNaN(v)) groups[group].push(v);
-      }
-    }
-    const yKey = aggregation === 'count' ? 'count' : `${aggregation}_${rawYKey}`;
-    const chartData = Object.entries(groups).map(([key, vals]) => {
-      let value: number;
-      if (aggregation === 'count')    value = vals.length;
-      else if (aggregation === 'avg') value = vals.length ? Math.round(vals.reduce((a,b)=>a+b,0)/vals.length) : 0;
-      else if (aggregation === 'sum') value = vals.reduce((a,b)=>a+b,0);
-      else if (aggregation === 'max') value = Math.max(...vals);
-      else                            value = Math.min(...vals);
-      return { [xKey]: key, [yKey]: value };
-    });
+  if (type === 'scatter') {
+    const yKey = rawYKey ?? numericField;
+    const chartData = data.map(row => ({
+      [xKey]: Number(row[xKey] ?? 0),
+      [yKey]: Number(row[yKey] ?? 0),
+    }));
     return { kind: 'chart', chartData, yKey };
   }
 
-  return null;
+  const groups: Record<string, number[]> = {};
+  for (const row of data) {
+    const group = String(row[xKey] ?? 'Unknown');
+    if (!groups[group]) groups[group] = [];
+    if (aggregation === 'count') { groups[group].push(1); }
+    else if (rawYKey) { const v = Number(row[rawYKey]); if (!isNaN(v)) groups[group].push(v); }
+  }
+  const yKey = aggregation === 'count' ? 'count' : `${aggregation}_${rawYKey}`;
+  const chartData = Object.entries(groups).map(([key, vals]) => {
+    let value: number;
+    if (aggregation === 'count')    value = vals.length;
+    else if (aggregation === 'avg') value = vals.length ? Math.round(vals.reduce((a,b)=>a+b,0)/vals.length) : 0;
+    else if (aggregation === 'sum') value = vals.reduce((a,b)=>a+b,0);
+    else if (aggregation === 'max') value = vals.length ? Math.max(...vals) : 0;
+    else                            value = vals.length ? Math.min(...vals) : 0;
+    return { [xKey]: key, [yKey]: value };
+  });
+  return { kind: 'chart', chartData, yKey };
 }
 
 // ── Chart renderer ────────────────────────────────────────────────────────────
@@ -317,13 +327,6 @@ export function SmartAnalytics({ data, className = '' }: SmartAnalyticsProps) {
     try {
       const result = await ai.analyzeData(columns.join(', '), query.trim());
       const exec = executeAnalysis(result, data);
-
-      if (!exec) {
-        setError('AI returned an incomplete response. Try rephrasing your query.');
-        setStatus('error');
-        return;
-      }
-
       setAiDecision(result);
       setExecution(exec);
       setStatus('done');
