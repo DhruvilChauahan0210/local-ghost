@@ -107,11 +107,20 @@ export default function HomePage() {
             Qwen2.5-Coder runs entirely on your GPU.
           </p>
 
-          <p className="seo-desc">
-            Local Ghost is an open-source React npm package that adds AI to your web app with no API keys, no backend, and no per-query costs.
-            Drop in <code>SmartDataGrid</code>, <code>SmartForm</code>, or <code>SmartAnalytics</code> — the Qwen2.5 model runs on the user&apos;s GPU via WebGPU, falling back to WASM on unsupported browsers.
-            Perfect for React developers who want AI-powered data filtering, form auto-fill, and chart generation without OpenAI, Anthropic, or any cloud dependency.
-          </p>
+          <div className="seo-desc" aria-label="Package description">
+            <span className="seo-line seo-punct">/**</span>
+            <span className="seo-line"> * <span className="seo-key">@package</span>   <span className="seo-val">@dhruvil0210/local-ghost</span></span>
+            <span className="seo-line"> * <span className="seo-key">@type</span>      <span className="seo-val">React AI components · WebGPU · no API keys · no server</span></span>
+            <span className="seo-line seo-blank"> *</span>
+            <span className="seo-line"> * Open-source React npm package. Add AI to any web app with zero API keys,</span>
+            <span className="seo-line"> * no backend, and no per-query cost. Drop in <span className="seo-code">SmartDataGrid</span>,</span>
+            <span className="seo-line"> * <span className="seo-code">SmartForm</span>, or <span className="seo-code">SmartAnalytics</span> — Qwen2.5 runs on the</span>
+            <span className="seo-line"> * user&apos;s GPU via WebGPU, with automatic WASM fallback.</span>
+            <span className="seo-line seo-blank"> *</span>
+            <span className="seo-line"> * For React developers who want AI-powered data filtering, form auto-fill,</span>
+            <span className="seo-line"> * and chart generation without OpenAI, Anthropic, or any cloud dependency.</span>
+            <span className="seo-line seo-punct"> */</span>
+          </div>
 
           {/* Terminal */}
           <div className="terminal">
