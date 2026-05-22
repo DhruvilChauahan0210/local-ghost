@@ -59,3 +59,19 @@ export const TRANSACTIONS: Transaction[] = [
   { id: 49, date: '2025-05-18', merchant: 'Jongro BBQ',                  category: 'Food & Dining',   amount:   78.40, type: 'expense' },
   { id: 50, date: '2025-05-19', merchant: 'Comcast Internet',            category: 'Utilities',       amount:   69.99, type: 'expense' },
 ];
+
+export const CATEGORY_COLORS: Record<string, string> = {
+  'Income':          '#22c55e',
+  'Rent':            '#f97316',
+  'Groceries':       '#84cc16',
+  'Food & Dining':   '#fb923c',
+  'Transport':       '#60a5fa',
+  'Shopping':        '#c084fc',
+  'Entertainment':   '#f472b6',
+  'Healthcare':      '#34d399',
+  'Health & Fitness':'#2dd4bf',
+  'Utilities':       '#94a3b8',
+  'Subscriptions':   '#818cf8',
+  'Travel':          '#fbbf24',
+  'Other':           '#64748b',
+};
