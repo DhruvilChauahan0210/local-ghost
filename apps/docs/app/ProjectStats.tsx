@@ -62,6 +62,8 @@ export default function ProjectStats() {
         monthlyDownloads: month?.downloads       ?? null,
       });
       setLoaded(true);
+    }).catch(() => {
+      setLoaded(true);
     });
   }, []);
 

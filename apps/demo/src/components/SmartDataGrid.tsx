@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useMemo } from 'react';
 import { useWebGPUAI } from '../hooks/useWebGPUAI';
 import { AIStatusBadge, TerminalLogPanel } from './AIStatusBadge';
 
@@ -32,7 +32,7 @@ export function SmartDataGrid({ data }: SmartDataGridProps) {
   const [statResult, setStatResult] = useState<{ label: string; value: string } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const columns = data.length > 0 ? Object.keys(data[0]) : [];
+  const columns = useMemo(() => data.length > 0 ? Object.keys(data[0]) : [], [data]);
 
   const handleRunQuery = useCallback(async () => {
     if (!query.trim() || ai.status !== 'ready') return;

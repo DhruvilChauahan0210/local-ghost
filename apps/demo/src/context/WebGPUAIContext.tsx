@@ -79,6 +79,7 @@ export function WebGPUAIProvider({ children, serverFallbackUrl }: WebGPUAIProvid
   const jsonRef        = useRef<Resolver<Record<string, string>> | null>(null);
   const analysisRef    = useRef<Resolver<AnalysisResult> | null>(null);
   const fallbackUrlRef = useRef(serverFallbackUrl);
+  const initializingRef = useRef(false); // prevents double-worker from rapid double-click
   fallbackUrlRef.current = serverFallbackUrl;
 
   const setProcessing = (v: boolean) =>
@@ -93,6 +94,10 @@ export function WebGPUAIProvider({ children, serverFallbackUrl }: WebGPUAIProvid
 
   const initAI = useCallback(() => {
     if (aiState.status !== 'uninitialized' && aiState.status !== 'disposed') return;
+    // Ref-based guard: blocks a second call that races in before the state update
+    // from the first call has propagated (e.g. rapid double-click).
+    if (initializingRef.current) return;
+    initializingRef.current = true;
 
     const hasWebGPU = typeof navigator !== 'undefined' && 'gpu' in navigator;
     const worker = new Worker(new URL('../workers/ai.worker.ts', import.meta.url), { type: 'module' });
@@ -110,6 +115,7 @@ export function WebGPUAIProvider({ children, serverFallbackUrl }: WebGPUAIProvid
           break;
 
         case 'READY':
+          initializingRef.current = false;
           setAiState(p => ({
             ...p, status: 'ready', progress: 100, error: null, isProcessing: false,
             // Use device reported by worker — could be 'wasm' after a hotswap
@@ -135,6 +141,7 @@ export function WebGPUAIProvider({ children, serverFallbackUrl }: WebGPUAIProvid
 
         case 'SYSTEM_STATUS':
           if (msg.status === 'disposed') {
+            initializingRef.current = false;
             setAiState(p => ({
               ...p, status: 'disposed', mode: null, progress: 0, isProcessing: false,
               systemLogs: addLog(p.systemLogs, '[LG_SYSTEM] VRAM purged — 5 min idle. Click Enable AI to reload.'),
@@ -169,6 +176,7 @@ export function WebGPUAIProvider({ children, serverFallbackUrl }: WebGPUAIProvid
 
         // Init-level failure — AI cannot recover
         case 'ERROR': {
+          initializingRef.current = false;
           const err = new Error(msg.message);
           if (fallbackUrlRef.current) {
             setAiState(p => ({ ...p, status: 'ready', progress: 100, error: null, mode: 'server' }));
@@ -182,6 +190,7 @@ export function WebGPUAIProvider({ children, serverFallbackUrl }: WebGPUAIProvid
     };
 
     worker.onerror = (e) => {
+      initializingRef.current = false;
       const message = e.message ?? 'Worker error';
       const err = new Error(message);
       if (fallbackUrlRef.current) {

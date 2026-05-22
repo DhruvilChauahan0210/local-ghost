@@ -28,7 +28,10 @@ export default function CursorEffects() {
         ring.style.top = `${e.clientY}px`;
         ring.style.animationDelay = `${i * 0.12}s`;
         document.body.appendChild(ring);
-        ring.addEventListener('animationend', () => ring.remove(), { once: true });
+        const cleanup = () => ring.remove();
+        ring.addEventListener('animationend', cleanup, { once: true });
+        // Fallback: remove after 1s in case animationend never fires (e.g. prefers-reduced-motion)
+        setTimeout(cleanup, 1000);
       }
     };
 

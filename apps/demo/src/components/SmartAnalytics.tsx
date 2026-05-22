@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
   ScatterChart, Scatter,
@@ -129,11 +129,13 @@ function executeAnalysis(result: AnalysisResult, data: Record<string, unknown>[]
   const type = result.type ?? 'bar';
 
   if (type === 'scatter') {
-    const yKey = rawYKey ?? numericField;
-    const chartData = data.map(row => ({
-      [xKey]: Number(row[xKey] ?? 0),
-      [yKey]: Number(row[yKey] ?? 0),
-    }));
+    const cols = data.length > 0 ? Object.keys(data[0]) : [];
+    const numericCols = cols.filter(c => typeof data[0][c] === 'number');
+    const scatterX = (result.xKey && numericCols.includes(result.xKey)) ? result.xKey : (numericCols[0] ?? xKey);
+    const yKey = (rawYKey && numericCols.includes(rawYKey)) ? rawYKey : (numericCols[1] ?? numericCols[0] ?? numericField);
+    const chartData = data
+      .map(row => ({ [scatterX]: Number(row[scatterX] ?? 0), [yKey]: Number(row[yKey] ?? 0) }))
+      .filter(row => !isNaN(row[scatterX] as number) && !isNaN(row[yKey] as number));
     return { kind: 'chart', chartData, yKey };
   }
 
@@ -163,7 +165,11 @@ const TICK = { fill: '#94a3b8', fontSize: 11 };
 const AXIS_LINE = { stroke: '#475569' };
 
 function renderChart(result: AnalysisResult, chartData: Record<string, unknown>[], yKey: string) {
-  const xK = result.xKey ?? '';
+  // For non-scatter charts xKey comes from result; for scatter derive it from chartData
+  // to stay consistent with the sanitized xKey chosen in executeAnalysis.
+  const xK = result.type === 'scatter'
+    ? (chartData.length > 0 ? Object.keys(chartData[0]).find(k => k !== yKey) ?? '' : '')
+    : (result.xKey ?? '');
 
   if (result.type === 'scatter') return (
     <ResponsiveContainer width="100%" height={300}>
@@ -315,7 +321,7 @@ export function SmartAnalytics({ data, className = '' }: SmartAnalyticsProps) {
   const [aiDecision, setAiDecision] = useState<AnalysisResult | null>(null);
   const [execution, setExecution]   = useState<Execution | null>(null);
 
-  const columns = data.length > 0 ? Object.keys(data[0]) : [];
+  const columns = useMemo(() => data.length > 0 ? Object.keys(data[0]) : [], [data]);
 
   const handleGenerate = useCallback(async () => {
     if (!query.trim() || ai.status !== 'ready') return;

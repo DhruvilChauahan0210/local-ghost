@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useWebGPUAI } from '../hooks/useWebGPUAI';
 import { AIStatusBadge, TerminalLogPanel } from './AIStatusBadge';
 
@@ -29,6 +29,7 @@ export function SmartForm({ fields, onSubmit, className = '' }: SmartFormProps) 
   );
   const [extractStatus, setExtractStatus] = useState<ExtractStatus>('idle');
   const [extractError, setExtractError] = useState<string | null>(null);
+  const extractingRef = useRef(false);
 
   const applyExtracted = useCallback((extracted: Record<string, string>) => {
     setValues(prev => {
@@ -44,8 +45,9 @@ export function SmartForm({ fields, onSubmit, className = '' }: SmartFormProps) 
   }, [fields]);
 
   const handleAutoFill = useCallback(async () => {
-    if (!pastedText.trim() || ai.status !== 'ready') return;
+    if (!pastedText.trim() || ai.status !== 'ready' || extractingRef.current) return;
 
+    extractingRef.current = true;
     setExtractStatus('running');
     setExtractError(null);
 
@@ -64,6 +66,8 @@ export function SmartForm({ fields, onSubmit, className = '' }: SmartFormProps) 
     } catch (err) {
       setExtractError(err instanceof Error ? err.message : 'AI extraction failed. Try rephrasing the text.');
       setExtractStatus('error');
+    } finally {
+      extractingRef.current = false;
     }
   }, [ai, fields, pastedText, applyExtracted]);
 

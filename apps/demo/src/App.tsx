@@ -2,15 +2,21 @@ import { useState, useEffect } from 'react';
 
 type Theme = 'dark' | 'light';
 
-function useTheme() {
-  const [theme, setTheme] = useState<Theme>('dark');
-  useEffect(() => {
+function resolveTheme(): Theme {
+  try {
     const stored = localStorage.getItem('lg-theme') as Theme | null;
-    const preferred = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
-    const resolved = stored ?? preferred;
-    setTheme(resolved);
+    if (stored === 'light' || stored === 'dark') return stored;
+  } catch { /* localStorage blocked */ }
+  return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+}
+
+function useTheme() {
+  const [theme, setTheme] = useState<Theme>(() => {
+    const resolved = resolveTheme();
     document.documentElement.setAttribute('data-theme', resolved);
-  }, []);
+    return resolved;
+  });
+  useEffect(() => { /* nothing — already applied synchronously in initializer */ }, []);
   function toggle() {
     const next: Theme = theme === 'dark' ? 'light' : 'dark';
     setTheme(next);
@@ -102,12 +108,12 @@ export default function App() {
 
       {/* ── NAV ── */}
       <nav className="demo-nav">
-        <a href="http://localhost:3000" className="demo-nav-logo">
+        <a href="https://local-ghost.vercel.app" className="demo-nav-logo">
           LOCAL GHOST<span style={{ animation: 'blink 1s step-end infinite' }}>_</span>
           <span className="demo-nav-sep">Live Demo</span>
         </a>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <span className="demo-nav-badge">v1.2.0</span>
+          <span className="demo-nav-badge">v1.2.1</span>
           <a href="https://github.com/DhruvilChauahan0210/local-ghost" target="_blank" rel="noreferrer" className="demo-nav-link">
             [ GitHub ]
           </a>
@@ -123,11 +129,11 @@ export default function App() {
 
       {menuOpen && (
         <div className="demo-mobile-menu" onClick={() => setMenuOpen(false)}>
-          <span className="demo-mobile-badge">v1.2.0</span>
+          <span className="demo-mobile-badge">v1.2.1</span>
           <a href="https://github.com/DhruvilChauahan0210/local-ghost" target="_blank" rel="noreferrer" className="demo-mobile-link">
             [ GitHub ]
           </a>
-          <a href="http://localhost:3000" className="demo-mobile-link accent">
+          <a href="https://local-ghost.vercel.app" className="demo-mobile-link accent">
             [ Docs ]
           </a>
         </div>
@@ -138,7 +144,7 @@ export default function App() {
 
         {/* ── HEADER ── */}
         <div className="demo-header">
-          <div className="demo-header-badge">v1.2.0 — 3 Components Active</div>
+          <div className="demo-header-badge">v1.2.1 — 3 Components Active</div>
           <h1 className="demo-header-h1">
             LOCAL<br />
             <span style={{ color: 'var(--green)', textShadow: '0 0 30px rgba(0,255,65,0.25)' }}>GHOST.</span>
