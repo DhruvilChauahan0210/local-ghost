@@ -108,7 +108,7 @@ export default function App() {
 
       {/* ── NAV ── */}
       <nav className="demo-nav">
-        <a href="https://local-ghost.vercel.app" className="demo-nav-logo">
+        <a href="https://local-ghost-docs.vercel.app" className="demo-nav-logo">
           LOCAL GHOST<span style={{ animation: 'blink 1s step-end infinite' }}>_</span>
           <span className="demo-nav-sep">Live Demo</span>
         </a>
@@ -133,7 +133,7 @@ export default function App() {
           <a href="https://github.com/DhruvilChauahan0210/local-ghost" target="_blank" rel="noreferrer" className="demo-mobile-link">
             [ GitHub ]
           </a>
-          <a href="https://local-ghost.vercel.app" className="demo-mobile-link accent">
+          <a href="https://local-ghost-docs.vercel.app" className="demo-mobile-link accent">
             [ Docs ]
           </a>
         </div>
