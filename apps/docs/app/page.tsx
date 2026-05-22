@@ -107,6 +107,12 @@ export default function HomePage() {
             Qwen2.5-Coder runs entirely on your GPU.
           </p>
 
+          <p className="seo-desc">
+            Local Ghost is an open-source React npm package that adds AI to your web app with no API keys, no backend, and no per-query costs.
+            Drop in <code>SmartDataGrid</code>, <code>SmartForm</code>, or <code>SmartAnalytics</code> — the Qwen2.5 model runs on the user&apos;s GPU via WebGPU, falling back to WASM on unsupported browsers.
+            Perfect for React developers who want AI-powered data filtering, form auto-fill, and chart generation without OpenAI, Anthropic, or any cloud dependency.
+          </p>
+
           {/* Terminal */}
           <div className="terminal">
             <div className="terminal-bar">
@@ -170,12 +176,12 @@ export default function HomePage() {
         </section>
 
         {/* ── LIVE PROJECT STATS ── */}
-        <div className="section-divider"><span>// LIVE PROJECT STATS</span></div>
+        <div className="section-divider" id="stats"><h2 className="section-divider-h2"><span>// LIVE PROJECT STATS</span></h2></div>
         <ProjectStats />
 
         {/* ── WHAT'S NEW v1.2.2 ── */}
-        <div className="section-divider"><span>// WHAT'S NEW IN v1.2.2</span></div>
-        <section className="changelog">
+        <div className="section-divider" id="changelog"><h2 className="section-divider-h2"><span>// WHAT'S NEW IN v1.2.2</span></h2></div>
+        <section className="changelog" aria-label="Changelog v1.2.2">
           {[
             {
               tag: 'NEW',
@@ -223,8 +229,8 @@ export default function HomePage() {
         </section>
 
         {/* ── WHAT'S NEW v1.1.0 ── */}
-        <div className="section-divider"><span>// WHAT'S NEW IN v1.1.0</span></div>
-        <section className="changelog">
+        <div className="section-divider" id="changelog-v1-1-0"><h2 className="section-divider-h2"><span>// WHAT'S NEW IN v1.1.0</span></h2></div>
+        <section className="changelog" aria-label="Changelog v1.1.0">
           {[
             {
               tag: 'NEW',
@@ -272,8 +278,8 @@ export default function HomePage() {
         </section>
 
         {/* ── COMPONENTS ── */}
-        <div className="section-divider"><span>// COMPONENTS</span></div>
-        <section className="features">
+        <div className="section-divider" id="components"><h2 className="section-divider-h2"><span>// COMPONENTS</span></h2></div>
+        <section className="features" aria-label="React AI components: SmartDataGrid, SmartForm, SmartAnalytics">
           {[
             {
               tag: '01',
@@ -304,8 +310,8 @@ export default function HomePage() {
         </section>
 
         {/* ── ANALYTICS API ── */}
-        <div className="section-divider"><span>// ANALYTICS ACTION TYPES</span></div>
-        <section className="action-grid">
+        <div className="section-divider" id="analytics"><h2 className="section-divider-h2"><span>// ANALYTICS ACTION TYPES</span></h2></div>
+        <section className="action-grid" aria-label="AI analytics action types: stat, table, chart, filter">
           {[
             {
               action: 'STAT',
@@ -347,8 +353,8 @@ export default function HomePage() {
         </section>
 
         {/* ── INSTALL ── */}
-        <div className="section-divider"><span>// INSTALL</span></div>
-        <section id="install" className="code-section">
+        <div className="section-divider"><h2 className="section-divider-h2"><span>// INSTALL</span></h2></div>
+        <section id="install" className="code-section" aria-label="Installation and quick start guide">
           <div className="code-block">
             <div className="code-label">NPM</div>
             <pre><code>
@@ -419,8 +425,8 @@ export default function HomePage() {
         </section>
 
         {/* ── ARCHITECTURE ── */}
-        <div className="section-divider"><span>// ARCHITECTURE</span></div>
-        <section className="features">
+        <div className="section-divider" id="architecture"><h2 className="section-divider-h2"><span>// ARCHITECTURE</span></h2></div>
+        <section className="features" aria-label="Technical architecture: WebGPU, security sandbox, VRAM management, Web Worker">
           {[
             {
               tag: '01',

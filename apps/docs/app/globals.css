@@ -762,3 +762,33 @@ footer {
 @media (max-width: 400px) {
   .nav-logo { font-size: 1rem; letter-spacing: 0.06em; }
 }
+
+/* ─── SEO: invisible h2 wrapper inside section-divider ─── */
+/* display:contents removes the box but keeps heading semantics for Google */
+.section-divider-h2 {
+  display: contents;
+  font: inherit;
+  margin: 0;
+  padding: 0;
+}
+
+/* ─── SEO: keyword-rich description paragraph after hero ─── */
+.seo-desc {
+  max-width: 52rem;
+  font-size: 0.82rem;
+  line-height: 1.8;
+  color: var(--muted);
+  margin: 1.5rem auto 0;
+  text-align: center;
+  padding: 0 1.25rem;
+}
+
+.seo-desc code {
+  font-family: 'JetBrains Mono', 'Fira Mono', monospace;
+  font-size: 0.78rem;
+  color: var(--green);
+  background: rgba(0,255,65,0.06);
+  padding: 0.1em 0.35em;
+  border-radius: 3px;
+  border: 1px solid rgba(0,255,65,0.15);
+}
