@@ -63,15 +63,15 @@ export default function Overview({ onNavigate }: { onNavigate: (p: string) => vo
       {/* KPIs */}
       <div className="kpis">
         {[
-          { label: 'Net Balance',    val: curr(stats.bal, 2), color: stats.bal >= 0 ? 'var(--green)' : 'var(--red)', badge: `${stats.rate}% saved` },
-          { label: 'Total Income',   val: curr(stats.inc),    color: 'var(--green)',  badge: `${transactions.filter(t=>t.type==='income').length} deposits` },
-          { label: 'Total Expenses', val: curr(stats.exp),    color: 'var(--red)',    badge: `${transactions.filter(t=>t.type==='expense').length} transactions` },
-          { label: 'Avg Daily Spend',val: curr(stats.exp/60), color: undefined,       badge: 'over 60 days' },
+          { label: 'Net Balance',     val: curr(stats.bal, 2), color: stats.bal >= 0 ? 'var(--green)' : 'var(--red)', accent: stats.bal >= 0 ? '#22c55e' : '#f43f5e', badge: `↑ ${stats.rate}% saved`, badgeCls: 'up' },
+          { label: 'Total Income',    val: curr(stats.inc),    color: 'var(--green)',  accent: '#22c55e', badge: `${transactions.filter(t=>t.type==='income').length} deposits`,     badgeCls: 'up' },
+          { label: 'Total Expenses',  val: curr(stats.exp),    color: 'var(--red)',    accent: '#f43f5e', badge: `${transactions.filter(t=>t.type==='expense').length} transactions`, badgeCls: 'down' },
+          { label: 'Avg Daily Spend', val: curr(stats.exp/60), color: undefined,       accent: '#60a5fa', badge: 'over 60 days', badgeCls: '' },
         ].map(k => (
-          <div key={k.label} className="kpi">
+          <div key={k.label} className="kpi" style={{ borderTop: `2px solid ${k.accent}22`, boxShadow: `0 0 0 0 transparent, inset 0 2px 0 ${k.accent}33` }}>
             <div className="kpi-label">{k.label}</div>
             <div className="kpi-val" style={{ color: k.color }}>{k.val}</div>
-            <div className="kpi-badge">{k.badge}</div>
+            <div className={`kpi-badge ${k.badgeCls}`}>{k.badge}</div>
           </div>
         ))}
       </div>

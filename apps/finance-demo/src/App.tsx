@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type JSX } from 'react';
 import { useWebGPUAI } from '@dhruvil0210/local-ghost';
 import Overview     from './pages/Overview';
 import Transactions from './pages/Transactions';
@@ -6,10 +6,33 @@ import Analytics    from './pages/Analytics';
 
 type Page = 'overview' | 'transactions' | 'analytics';
 
+const NAV_ICONS: Record<string, JSX.Element> = {
+  overview: (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <rect x="1" y="1" width="6" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.4"/>
+      <rect x="9" y="1" width="6" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.4"/>
+      <rect x="1" y="9" width="6" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.4"/>
+      <rect x="9" y="9" width="6" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.4"/>
+    </svg>
+  ),
+  transactions: (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <path d="M2 4h12M2 8h9M2 12h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+      <path d="M12 10l2 2-2 2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  ),
+  analytics: (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <path d="M1.5 12.5l3.5-4 3 2.5 3.5-5.5 3 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+      <circle cx="13" cy="8.5" r="1" fill="currentColor"/>
+    </svg>
+  ),
+};
+
 const NAV = [
-  { id: 'overview'     as Page, label: 'Overview',     icon: '⊡' },
-  { id: 'transactions' as Page, label: 'Transactions', icon: '↕' },
-  { id: 'analytics'   as Page, label: 'Analytics',    icon: '◎' },
+  { id: 'overview'     as Page, label: 'Overview',     },
+  { id: 'transactions' as Page, label: 'Transactions', },
+  { id: 'analytics'   as Page, label: 'Analytics',    },
 ];
 
 const BUDGETS = [
@@ -79,7 +102,7 @@ export default function App() {
                   className={`nav-item${page === n.id ? ' active' : ''}`}
                   onClick={() => navigate(n.id)}
                 >
-                  <span className="nav-icon">{n.icon}</span>
+                  <span className="nav-icon">{NAV_ICONS[n.id]}</span>
                   {n.label}
                 </button>
               ))}
