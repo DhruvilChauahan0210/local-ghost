@@ -1,0 +1,61 @@
+export interface Transaction {
+  id: number;
+  date: string;
+  merchant: string;
+  category: string;
+  amount: number;
+  type: 'income' | 'expense';
+}
+
+export const TRANSACTIONS: Transaction[] = [
+  { id:  1, date: '2025-04-01', merchant: 'Employer Direct Deposit',    category: 'Income',          amount: 5200.00, type: 'income'  },
+  { id:  2, date: '2025-04-01', merchant: 'Sunset Apartments',           category: 'Rent',            amount: 1850.00, type: 'expense' },
+  { id:  3, date: '2025-04-02', merchant: 'Whole Foods Market',          category: 'Groceries',       amount:   94.32, type: 'expense' },
+  { id:  4, date: '2025-04-03', merchant: 'Spotify',                     category: 'Subscriptions',   amount:   11.99, type: 'expense' },
+  { id:  5, date: '2025-04-04', merchant: 'Shell Gas Station',           category: 'Transport',       amount:   48.70, type: 'expense' },
+  { id:  6, date: '2025-04-05', merchant: "McDonald's",                  category: 'Food & Dining',   amount:   14.32, type: 'expense' },
+  { id:  7, date: '2025-04-06', merchant: 'Amazon',                      category: 'Shopping',        amount:   67.99, type: 'expense' },
+  { id:  8, date: '2025-04-07', merchant: 'Netflix',                     category: 'Subscriptions',   amount:   15.99, type: 'expense' },
+  { id:  9, date: '2025-04-08', merchant: "Trader Joe's",                category: 'Groceries',       amount:   78.43, type: 'expense' },
+  { id: 10, date: '2025-04-09', merchant: 'Uber',                        category: 'Transport',       amount:   23.40, type: 'expense' },
+  { id: 11, date: '2025-04-10', merchant: 'Starbucks',                   category: 'Food & Dining',   amount:   18.75, type: 'expense' },
+  { id: 12, date: '2025-04-11', merchant: 'CVS Pharmacy',                category: 'Healthcare',      amount:   34.90, type: 'expense' },
+  { id: 13, date: '2025-04-12', merchant: 'Pacific Gas & Electric',      category: 'Utilities',       amount:  112.40, type: 'expense' },
+  { id: 14, date: '2025-04-13', merchant: 'Chipotle',                    category: 'Food & Dining',   amount:   22.80, type: 'expense' },
+  { id: 15, date: '2025-04-14', merchant: 'Comcast Internet',            category: 'Utilities',       amount:   69.99, type: 'expense' },
+  { id: 16, date: '2025-04-15', merchant: 'Freelance — Design Project',  category: 'Income',          amount: 1800.00, type: 'income'  },
+  { id: 17, date: '2025-04-16', merchant: 'Safeway',                     category: 'Groceries',       amount:   61.25, type: 'expense' },
+  { id: 18, date: '2025-04-17', merchant: 'Anytime Fitness',             category: 'Health & Fitness',amount:   45.00, type: 'expense' },
+  { id: 19, date: '2025-04-18', merchant: 'Apple One',                   category: 'Subscriptions',   amount:   21.95, type: 'expense' },
+  { id: 20, date: '2025-04-19', merchant: 'Target',                      category: 'Shopping',        amount:   83.47, type: 'expense' },
+  { id: 21, date: '2025-04-20', merchant: 'Lyft',                        category: 'Transport',       amount:   31.20, type: 'expense' },
+  { id: 22, date: '2025-04-21', merchant: 'Nobu Restaurant',             category: 'Food & Dining',   amount:   97.50, type: 'expense' },
+  { id: 23, date: '2025-04-22', merchant: 'City Parking Garage',         category: 'Transport',       amount:   18.00, type: 'expense' },
+  { id: 24, date: '2025-04-23', merchant: 'ChatGPT Plus',                category: 'Subscriptions',   amount:   20.00, type: 'expense' },
+  { id: 25, date: '2025-04-24', merchant: 'H&M',                         category: 'Shopping',        amount:   54.90, type: 'expense' },
+  { id: 26, date: '2025-04-25', merchant: 'Whole Foods Market',          category: 'Groceries',       amount:  102.18, type: 'expense' },
+  { id: 27, date: '2025-04-26', merchant: 'AMC Theaters',                category: 'Entertainment',   amount:   28.50, type: 'expense' },
+  { id: 28, date: '2025-04-27', merchant: 'BART Transit',                category: 'Transport',       amount:   15.60, type: 'expense' },
+  { id: 29, date: '2025-04-28', merchant: 'Dividend — AAPL',             category: 'Income',          amount:   42.80, type: 'income'  },
+  { id: 30, date: '2025-04-29', merchant: 'Dental Checkup',              category: 'Healthcare',      amount:  180.00, type: 'expense' },
+  { id: 31, date: '2025-05-01', merchant: 'Employer Direct Deposit',     category: 'Income',          amount: 5200.00, type: 'income'  },
+  { id: 32, date: '2025-05-01', merchant: 'Sunset Apartments',           category: 'Rent',            amount: 1850.00, type: 'expense' },
+  { id: 33, date: '2025-05-02', merchant: "Trader Joe's",                category: 'Groceries',       amount:   73.85, type: 'expense' },
+  { id: 34, date: '2025-05-03', merchant: 'Uber Eats',                   category: 'Food & Dining',   amount:   42.30, type: 'expense' },
+  { id: 35, date: '2025-05-04', merchant: 'Shell Gas Station',           category: 'Transport',       amount:   52.10, type: 'expense' },
+  { id: 36, date: '2025-05-05', merchant: 'Amazon',                      category: 'Shopping',        amount:  124.99, type: 'expense' },
+  { id: 37, date: '2025-05-06', merchant: 'Spotify',                     category: 'Subscriptions',   amount:   11.99, type: 'expense' },
+  { id: 38, date: '2025-05-07', merchant: 'Whole Foods Market',          category: 'Groceries',       amount:   88.60, type: 'expense' },
+  { id: 39, date: '2025-05-08', merchant: 'Chipotle',                    category: 'Food & Dining',   amount:   19.45, type: 'expense' },
+  { id: 40, date: '2025-05-09', merchant: 'Netflix',                     category: 'Subscriptions',   amount:   15.99, type: 'expense' },
+  { id: 41, date: '2025-05-10', merchant: 'Parking Ticket — SFMTA',      category: 'Transport',       amount:   65.00, type: 'expense' },
+  { id: 42, date: '2025-05-11', merchant: 'Walgreens',                   category: 'Healthcare',      amount:   28.40, type: 'expense' },
+  { id: 43, date: '2025-05-12', merchant: 'Freelance — Dev Consulting',  category: 'Income',          amount: 2400.00, type: 'income'  },
+  { id: 44, date: '2025-05-13', merchant: 'Pacific Gas & Electric',      category: 'Utilities',       amount:   98.30, type: 'expense' },
+  { id: 45, date: '2025-05-14', merchant: 'SFO → JFK — United Airlines', category: 'Travel',          amount:  312.00, type: 'expense' },
+  { id: 46, date: '2025-05-15', merchant: 'Hotel Pennsylvania NYC',      category: 'Travel',          amount:  189.00, type: 'expense' },
+  { id: 47, date: '2025-05-16', merchant: 'Anytime Fitness',             category: 'Health & Fitness',amount:   45.00, type: 'expense' },
+  { id: 48, date: '2025-05-17', merchant: 'Zara',                        category: 'Shopping',        amount:   95.00, type: 'expense' },
+  { id: 49, date: '2025-05-18', merchant: 'Jongro BBQ',                  category: 'Food & Dining',   amount:   78.40, type: 'expense' },
+  { id: 50, date: '2025-05-19', merchant: 'Comcast Internet',            category: 'Utilities',       amount:   69.99, type: 'expense' },
+];
