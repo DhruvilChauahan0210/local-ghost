@@ -5,17 +5,23 @@ export const alt         = 'Local Ghost — Ask Your Data Anything';
 export const size        = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
-// Fetch a Google Font as raw bytes for Satori.
-// Returns null on any failure so the image still renders with a fallback font.
+// Fetch a Google Font as raw TTF bytes for Satori.
+// Satori only supports TTF/OTF — NOT woff2.
+// Using an old Safari UA makes Google Fonts serve TTF instead of woff2.
 async function loadGoogleFont(family: string): Promise<ArrayBuffer | null> {
   try {
     const css = await fetch(
       `https://fonts.googleapis.com/css2?family=${encodeURIComponent(family)}&display=swap`,
-      { headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' } }
+      {
+        headers: {
+          // Old Safari → Google Fonts responds with format('truetype') TTF files
+          'User-Agent': 'Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10_6_8; de-at) AppleWebKit/533.21.1 (KHTML, like Gecko) Version/5.0.5 Safari/533.21.1',
+        },
+      }
     ).then(r => r.text());
 
-    // Google returns multiple @font-face blocks per subset — take the last one (latin)
-    const matches = [...css.matchAll(/src: url\(([^)]+)\) format\('woff2'\)/g)];
+    // Take the last @font-face block (latin subset) — match truetype, not woff2
+    const matches = [...css.matchAll(/src: url\(([^)]+)\) format\('(?:truetype|opentype)'\)/g)];
     const url = matches[matches.length - 1]?.[1];
     if (!url) return null;
 
