@@ -61,17 +61,12 @@ export const TRANSACTIONS: Transaction[] = [
 ];
 
 export const CATEGORY_COLORS: Record<string, string> = {
-  'Income':          '#22c55e',
-  'Rent':            '#f97316',
-  'Groceries':       '#84cc16',
-  'Food & Dining':   '#fb923c',
-  'Transport':       '#60a5fa',
-  'Shopping':        '#c084fc',
-  'Entertainment':   '#f472b6',
-  'Healthcare':      '#34d399',
-  'Health & Fitness':'#2dd4bf',
-  'Utilities':       '#94a3b8',
-  'Subscriptions':   '#818cf8',
-  'Travel':          '#fbbf24',
-  'Other':           '#64748b',
+  'Income': '#22c55e', 'Rent': '#f97316', 'Groceries': '#84cc16',
+  'Food & Dining': '#fb923c', 'Transport': '#60a5fa', 'Shopping': '#c084fc',
+  'Entertainment': '#f472b6', 'Healthcare': '#34d399', 'Health & Fitness': '#2dd4bf',
+  'Utilities': '#94a3b8', 'Subscriptions': '#818cf8', 'Travel': '#fbbf24', 'Other': '#64748b',
 };
+
+export const CATEGORIES = ['All','Income','Groceries','Food & Dining','Transport','Shopping','Subscriptions','Rent','Utilities','Healthcare','Health & Fitness','Travel','Entertainment'];
+
+export const FORM_CATEGORIES = ['Groceries','Food & Dining','Transport','Shopping','Entertainment','Healthcare','Health & Fitness','Utilities','Subscriptions','Travel','Rent','Income','Other'];

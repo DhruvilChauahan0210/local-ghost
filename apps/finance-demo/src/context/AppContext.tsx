@@ -2,35 +2,30 @@ import { createContext, useContext, useState, useMemo, type ReactNode } from 're
 import { TRANSACTIONS } from '../data/transactions';
 import type { Transaction } from '../data/transactions';
 
-interface AppContextValue {
+interface AppCtx {
   transactions: Transaction[];
   addTransaction: (t: Omit<Transaction, 'id'>) => void;
-  records: Record<string, unknown>[];
+  schema: string;
 }
 
-const AppContext = createContext<AppContextValue | null>(null);
+const Ctx = createContext<AppCtx | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [transactions, setTransactions] = useState<Transaction[]>(TRANSACTIONS);
 
-  const addTransaction = (t: Omit<Transaction, 'id'>) => {
+  const schema = useMemo(
+    () => Object.keys(TRANSACTIONS[0]).join(', '),
+    []
+  );
+
+  const addTransaction = (t: Omit<Transaction, 'id'>) =>
     setTransactions(prev => [{ ...t, id: prev.length + 1 }, ...prev]);
-  };
 
-  const records = useMemo(
-    () => transactions as unknown as Record<string, unknown>[],
-    [transactions]
-  );
-
-  return (
-    <AppContext.Provider value={{ transactions, addTransaction, records }}>
-      {children}
-    </AppContext.Provider>
-  );
+  return <Ctx.Provider value={{ transactions, addTransaction, schema }}>{children}</Ctx.Provider>;
 }
 
-export function useApp() {
-  const ctx = useContext(AppContext);
-  if (!ctx) throw new Error('useApp must be used inside AppProvider');
-  return ctx;
-}
+export const useAppCtx = () => {
+  const c = useContext(Ctx);
+  if (!c) throw new Error('useAppCtx outside AppProvider');
+  return c;
+};
