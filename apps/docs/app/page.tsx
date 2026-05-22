@@ -74,7 +74,7 @@ export default function HomePage() {
         <div className="nav-links">
           <a href="https://www.npmjs.com/package/@dhruvil0210/local-ghost" className="nav-link" target="_blank" rel="noreferrer">[ npm ]</a>
           <a href="https://github.com/DhruvilChauahan0210/local-ghost" className="nav-link" target="_blank" rel="noreferrer">[ GitHub ]</a>
-          <a href="http://localhost:5173" className="nav-link accent">[ Live Demo ]</a>
+          <a href="https://local-ghost-demo.vercel.app" className="nav-link accent">[ Live Demo ]</a>
           <ThemeToggle />
           <button className="nav-hamburger" onClick={() => setMenuOpen(o => !o)} aria-label="Menu">
             {menuOpen ? '[ ✕ ]' : '[ ≡ ]'}
@@ -86,14 +86,14 @@ export default function HomePage() {
         <div className="nav-mobile-menu" onClick={() => setMenuOpen(false)}>
           <a href="https://www.npmjs.com/package/@dhruvil0210/local-ghost" className="nav-mobile-link" target="_blank" rel="noreferrer">[ npm ]</a>
           <a href="https://github.com/DhruvilChauahan0210/local-ghost" className="nav-mobile-link" target="_blank" rel="noreferrer">[ GitHub ]</a>
-          <a href="http://localhost:5173" className="nav-mobile-link accent">[ Live Demo ]</a>
+          <a href="https://local-ghost-demo.vercel.app" className="nav-mobile-link accent">[ Live Demo ]</a>
         </div>
       )}
 
       <main>
         {/* ── HERO ── */}
         <section className="hero">
-          <div className="badge">v1.2.0 &mdash; MIT LICENSE &mdash; OPEN SOURCE</div>
+          <div className="badge">v1.2.1 &mdash; MIT LICENSE &mdash; OPEN SOURCE</div>
 
           <h1 className="headline">
             ASK YOUR<br />
@@ -113,7 +113,7 @@ export default function HomePage() {
               <span className="terminal-dot red" />
               <span className="terminal-dot yellow" />
               <span className="terminal-dot green" />
-              <span className="terminal-title">local-ghost — v1.2.0</span>
+              <span className="terminal-title">local-ghost — v1.2.1</span>
               <span className="terminal-badge" style={{ color: TYPE_COLOR[current.type] }}>
                 {current.type.toUpperCase()}
               </span>
@@ -173,8 +173,8 @@ export default function HomePage() {
         <div className="section-divider"><span>// LIVE PROJECT STATS</span></div>
         <ProjectStats />
 
-        {/* ── WHAT'S NEW v1.2.0 ── */}
-        <div className="section-divider"><span>// WHAT'S NEW IN v1.2.0</span></div>
+        {/* ── WHAT'S NEW v1.2.1 ── */}
+        <div className="section-divider"><span>// WHAT'S NEW IN v1.2.1</span></div>
         <section className="changelog">
           {[
             {
@@ -472,7 +472,7 @@ export default function HomePage() {
           <div className="footer-inner">
             <span className="footer-logo">LOCAL GHOST_</span>
             <span>
-              <span className="c-green">@dhruvil0210/local-ghost@1.2.0</span>
+              <span className="c-green">@dhruvil0210/local-ghost@1.2.1</span>
               {' '}· Qwen2.5-Coder + WebGPU · MIT
             </span>
           </div>
