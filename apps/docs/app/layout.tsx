@@ -63,21 +63,14 @@ export const metadata: Metadata = {
     siteName:    'Local Ghost',
     title:        TITLE,
     description:  DESC,
-    images: [
-      {
-        url:    '/og-image.png',
-        width:  1200,
-        height: 630,
-        alt:    'Local Ghost — AI React Components That Run in the Browser',
-      },
-    ],
+    // No images array — Next.js auto-discovers app/opengraph-image.tsx
   },
 
   twitter: {
     card:        'summary_large_image',
     title:        TITLE,
     description:  DESC,
-    images:      ['/og-image.png'],
+    // No images array — Next.js auto-discovers app/opengraph-image.tsx
     creator:     '@DhruvilChauahan',
   },
 
