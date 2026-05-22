@@ -113,7 +113,7 @@ export default function App() {
           <span className="demo-nav-sep">Live Demo</span>
         </a>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <span className="demo-nav-badge">v1.2.1</span>
+          <span className="demo-nav-badge">v1.2.2</span>
           <a href="https://github.com/DhruvilChauahan0210/local-ghost" target="_blank" rel="noreferrer" className="demo-nav-link">
             [ GitHub ]
           </a>
@@ -129,7 +129,7 @@ export default function App() {
 
       {menuOpen && (
         <div className="demo-mobile-menu" onClick={() => setMenuOpen(false)}>
-          <span className="demo-mobile-badge">v1.2.1</span>
+          <span className="demo-mobile-badge">v1.2.2</span>
           <a href="https://github.com/DhruvilChauahan0210/local-ghost" target="_blank" rel="noreferrer" className="demo-mobile-link">
             [ GitHub ]
           </a>
@@ -144,7 +144,7 @@ export default function App() {
 
         {/* ── HEADER ── */}
         <div className="demo-header">
-          <div className="demo-header-badge">v1.2.1 — 3 Components Active</div>
+          <div className="demo-header-badge">v1.2.2 — 3 Components Active</div>
           <h1 className="demo-header-h1">
             LOCAL<br />
             <span style={{ color: 'var(--green)', textShadow: '0 0 30px rgba(0,255,65,0.25)' }}>GHOST.</span>
