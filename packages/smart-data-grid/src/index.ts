@@ -6,5 +6,6 @@ export { useWebGPUAI } from './hooks/useWebGPUAI';
 export { safelyExecuteGeneratedCode, verifyCodeSafety } from './utils/sandbox';
 export type { AIState, AnalysisResult, WebGPUAIProviderProps } from './context/WebGPUAIContext';
 export type { UseWebGPUAIReturn } from './hooks/useWebGPUAI';
+export type { SmartDataGridProps } from './components/SmartDataGrid';
 export type { SmartFormProps, SmartFormField } from './components/SmartForm';
 export type { SmartAnalyticsProps } from './components/SmartAnalytics';

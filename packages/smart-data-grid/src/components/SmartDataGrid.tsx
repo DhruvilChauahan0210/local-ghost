@@ -1,113 +1,12 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useMemo } from 'react';
 import { useWebGPUAI } from '../hooks/useWebGPUAI';
-import { safelyExecuteGeneratedCode } from '../utils/sandbox';
+import { AIStatusBadge, TerminalLogPanel } from './AIStatusBadge';
 
-interface SmartDataGridProps {
+export interface SmartDataGridProps {
   data: Record<string, unknown>[];
 }
 
-type QueryStatus = 'idle' | 'running' | 'error';
-
-// Inject row animation keyframes once per document
-let _styleInjected = false;
-function ensureAnimationStyles() {
-  if (_styleInjected || typeof document === 'undefined') return;
-  _styleInjected = true;
-  const el = document.createElement('style');
-  el.textContent = `
-    @keyframes lgRowIn {
-      from { opacity: 0; transform: translateY(5px); }
-      to   { opacity: 1; transform: translateY(0);   }
-    }
-  `;
-  document.head.appendChild(el);
-}
-
-function AIStatusBadge({
-  status,
-  progress,
-  error,
-}: {
-  status: 'uninitialized' | 'loading' | 'ready' | 'error' | 'disposed';
-  progress: number;
-  error: string | null;
-}) {
-  if (status === 'loading') {
-    return (
-      <div className="flex items-center gap-2 rounded-full bg-indigo-500/10 border border-indigo-500/30 px-3 py-1.5 text-xs font-medium text-indigo-300">
-        <svg
-          className="h-3.5 w-3.5 animate-spin"
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-        >
-          <circle
-            className="opacity-25"
-            cx="12"
-            cy="12"
-            r="10"
-            stroke="currentColor"
-            strokeWidth="4"
-          />
-          <path
-            className="opacity-75"
-            fill="currentColor"
-            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-          />
-        </svg>
-        <span>Loading model&hellip; {progress}%</span>
-      </div>
-    );
-  }
-
-  if (status === 'ready') {
-    return (
-      <div className="flex items-center gap-2 rounded-full bg-emerald-500/10 border border-emerald-500/30 px-3 py-1.5 text-xs font-medium text-emerald-300">
-        <svg
-          className="h-3.5 w-3.5"
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 20 20"
-          fill="currentColor"
-          aria-hidden="true"
-        >
-          <path
-            fillRule="evenodd"
-            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
-            clipRule="evenodd"
-          />
-        </svg>
-        <span>AI Ready &mdash; WebGPU</span>
-      </div>
-    );
-  }
-
-  if (status === 'error') {
-    return (
-      <div
-        className="flex items-center gap-2 rounded-full bg-red-500/10 border border-red-500/30 px-3 py-1.5 text-xs font-medium text-red-300"
-        title={error ?? 'Unknown error'}
-      >
-        <svg
-          className="h-3.5 w-3.5"
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 20 20"
-          fill="currentColor"
-          aria-hidden="true"
-        >
-          <path
-            fillRule="evenodd"
-            d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z"
-            clipRule="evenodd"
-          />
-        </svg>
-        <span>AI Unavailable</span>
-      </div>
-    );
-  }
-
-  return null;
-}
+type QueryStatus = 'idle' | 'running' | 'error' | 'stat';
 
 function CellValue({ value }: { value: unknown }) {
   if (value === null || value === undefined) {
@@ -129,38 +28,46 @@ export function SmartDataGrid({ data }: SmartDataGridProps) {
   const [displayData, setDisplayData] = useState<Record<string, unknown>[]>(data);
   const [queryStatus, setQueryStatus] = useState<QueryStatus>('idle');
   const [queryError, setQueryError] = useState<string | null>(null);
-  // Incremented on each successful filter to trigger row re-mount animation
-  const [filterKey, setFilterKey] = useState(0);
+  const [usedFallback, setUsedFallback] = useState(false);
+  const [statResult, setStatResult] = useState<{ label: string; value: string } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    ensureAnimationStyles();
-  }, []);
-
-  const columns = data.length > 0 ? Object.keys(data[0]) : [];
+  const columns = useMemo(() => data.length > 0 ? Object.keys(data[0]) : [], [data]);
 
   const handleRunQuery = useCallback(async () => {
     if (!query.trim() || ai.status !== 'ready') return;
 
     setQueryStatus('running');
     setQueryError(null);
+    setStatResult(null);
 
     const schema = columns.join(', ');
 
     try {
-      const { code } = await ai.runQuery(schema, query.trim());
+      const { code, usedFallback: fb } = await ai.runQuery(schema, query.trim());
+      setUsedFallback(fb);
 
-      const result = safelyExecuteGeneratedCode(code, data);
+      // Hardened sandbox: shadow dangerous globals with null
+      const sandboxed = new Function(
+        'data', 'window', 'document', 'fetch', 'localStorage', 'sessionStorage',
+        `"use strict"; const fn = ${code}; return fn(data);`
+      );
+      const result = sandboxed(data, null, null, null, null, null) as unknown;
 
-      if (result === null) {
-        throw new Error('Generated code was blocked by the security sandbox or failed to execute');
+      if (Array.isArray(result)) {
+        setDisplayData(result as Record<string, unknown>[]);
+        setQueryStatus('idle');
+      } else if (typeof result === 'number' || typeof result === 'string' || typeof result === 'boolean') {
+        // AI computed a scalar (count, average, etc.) — surface it as a stat card
+        const formatted = typeof result === 'number' ? result.toLocaleString() : String(result);
+        setStatResult({ label: query.trim(), value: formatted });
+        setDisplayData(data); // restore full table below the stat
+        setQueryStatus('stat');
+      } else {
+        throw new TypeError(`AI code returned ${typeof result} — expected an array. For aggregations try the Analytics tab.`);
       }
-
-      setDisplayData(result);
-      setFilterKey((k) => k + 1);
-      setQueryStatus('idle');
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Unknown error';
+      const msg = err instanceof Error ? err.message : String(err);
       setQueryError(msg);
       setQueryStatus('error');
     }
@@ -171,7 +78,8 @@ export function SmartDataGrid({ data }: SmartDataGridProps) {
     setQuery('');
     setQueryStatus('idle');
     setQueryError(null);
-    setFilterKey((k) => k + 1);
+    setUsedFallback(false);
+    setStatResult(null);
     inputRef.current?.focus();
   }, [data]);
 
@@ -184,7 +92,7 @@ export function SmartDataGrid({ data }: SmartDataGridProps) {
     [handleRunQuery]
   );
 
-  const isFiltered = displayData.length !== data.length;
+  const isFiltered = queryStatus !== 'stat' && displayData.length !== data.length;
 
   return (
     <div className="flex flex-col gap-4">
@@ -215,6 +123,7 @@ export function SmartDataGrid({ data }: SmartDataGridProps) {
             status={ai.status}
             progress={ai.progress}
             error={ai.error}
+            mode={ai.mode}
           />
         </div>
 
@@ -306,7 +215,7 @@ export function SmartDataGrid({ data }: SmartDataGridProps) {
               </>
             )}
           </button>
-          {(isFiltered || queryStatus === 'error') && (
+          {(isFiltered || queryStatus === 'error' || queryStatus === 'stat') && (
             <button
               onClick={handleReset}
               className="flex items-center gap-1.5 rounded-lg border border-slate-600 bg-slate-700/50 px-4 py-2.5 text-sm font-medium text-slate-300 transition-all hover:bg-slate-700 active:scale-95"
@@ -352,28 +261,22 @@ export function SmartDataGrid({ data }: SmartDataGridProps) {
           </div>
         )}
 
-        {ai.status === 'error' && ai.error && (
-          <div className="mt-3 flex items-start gap-2 rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-2.5 text-xs text-amber-300">
-            <svg
-              className="mt-0.5 h-3.5 w-3.5 shrink-0"
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-              aria-hidden="true"
-            >
-              <path
-                fillRule="evenodd"
-                d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z"
-                clipRule="evenodd"
-              />
-            </svg>
-            <span>
-              <strong className="font-semibold">WebGPU unavailable:</strong>{' '}
-              {ai.error}
-            </span>
-          </div>
-        )}
+        <TerminalLogPanel logs={ai.systemLogs} visible={ai.status === 'loading'} />
       </div>
+
+      {/* Stat card — when AI returned a scalar instead of rows */}
+      {queryStatus === 'stat' && statResult && (
+        <div className="rounded-xl border border-emerald-500/20 bg-[#1a1d27] px-6 py-5 shadow-xl flex items-center justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-1">{statResult.label}</p>
+            <p className="font-mono text-4xl font-bold text-emerald-400 tracking-tight">{statResult.value}</p>
+          </div>
+          <p className="text-xs text-slate-600 max-w-[200px] text-right leading-relaxed">
+            For charts, averages, and breakdowns use the{' '}
+            <span className="text-slate-400">Analytics</span> tab.
+          </p>
+        </div>
+      )}
 
       {/* Stats Bar */}
       <div className="flex items-center justify-between px-1">
@@ -390,6 +293,11 @@ export function SmartDataGrid({ data }: SmartDataGridProps) {
           {isFiltered && (
             <span className="inline-flex items-center rounded-full bg-indigo-500/15 px-2 py-0.5 text-xs font-medium text-indigo-300 border border-indigo-500/20">
               Filtered
+            </span>
+          )}
+          {usedFallback && (
+            <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-400 border border-amber-500/20" title="AI produced invalid code — basic pattern matching used as repair">
+              Basic repair
             </span>
           )}
         </div>
@@ -451,12 +359,7 @@ export function SmartDataGrid({ data }: SmartDataGridProps) {
               ) : (
                 displayData.map((row, rowIndex) => (
                   <tr
-                    key={`${filterKey}-${rowIndex}`}
-                    style={{
-                      animation: 'lgRowIn 0.2s ease forwards',
-                      animationDelay: `${Math.min(rowIndex * 18, 280)}ms`,
-                      opacity: 0,
-                    }}
+                    key={rowIndex}
                     className={
                       rowIndex % 2 === 0
                         ? 'bg-transparent hover:bg-slate-800/40 transition-colors'
