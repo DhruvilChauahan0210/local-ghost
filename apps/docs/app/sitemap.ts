@@ -9,10 +9,28 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority:         1,
     },
     {
-      url:             'https://local-ghost-demo.vercel.app',
+      url:             'https://local-ghost-docs.vercel.app/#components',
       lastModified:     new Date(),
-      changeFrequency: 'weekly',
+      changeFrequency: 'monthly',
+      priority:         0.9,
+    },
+    {
+      url:             'https://local-ghost-docs.vercel.app/#install',
+      lastModified:     new Date(),
+      changeFrequency: 'monthly',
+      priority:         0.9,
+    },
+    {
+      url:             'https://local-ghost-docs.vercel.app/#analytics',
+      lastModified:     new Date(),
+      changeFrequency: 'monthly',
       priority:         0.8,
+    },
+    {
+      url:             'https://local-ghost-docs.vercel.app/#architecture',
+      lastModified:     new Date(),
+      changeFrequency: 'monthly',
+      priority:         0.7,
     },
   ];
 }
