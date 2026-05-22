@@ -86,7 +86,7 @@ export default function Overview({ onNavigate }: { onNavigate: (p: string) => vo
             <BarChart data={monthly} margin={{ top:4, right:4, left:-18, bottom:0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
               <XAxis dataKey="label" tick={{ fill:'#64748b', fontSize:11 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill:'#64748b', fontSize:10 }} axisLine={false} tickLine={false} tickFormatter={v=>`$${(v/1000).toFixed(0)}k`} />
+              <YAxis tick={{ fill:'#64748b', fontSize:10 }} axisLine={false} tickLine={false} tickFormatter={v => v >= 1000 ? `$${(v/1000).toFixed(0)}k` : `$${Math.round(v)}`} />
               <Tooltip contentStyle={TS} formatter={(v:number)=>[curr(v)]} />
               <Bar dataKey="income"   fill="#22c55e" radius={[3,3,0,0]} opacity={0.85} />
               <Bar dataKey="expenses" fill="#f43f5e" radius={[3,3,0,0]} opacity={0.85} />

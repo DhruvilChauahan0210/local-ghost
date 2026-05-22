@@ -13,6 +13,10 @@ import type { Transaction } from '../data/transactions';
 
 const curr = (n: number) =>
   new Intl.NumberFormat('en-US', { style:'currency', currency:'USD', maximumFractionDigits: 0 }).format(n);
+
+// Smart axis formatter: $1k for large values, $123 for small values
+const fmtAxis = (v: number) =>
+  v >= 1000 ? `$${(v / 1000).toFixed(0)}k` : `$${Math.round(v)}`;
 const currFull = (n: number) =>
   new Intl.NumberFormat('en-US', { style:'currency', currency:'USD', minimumFractionDigits: 2 }).format(n);
 
@@ -183,7 +187,7 @@ function AiResultRenderer({ result, data }: { result: AnalysisResult, data: Tran
       <LineChart data={chartData} margin={{ top:4,right:12,left:-16,bottom:0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
         <XAxis dataKey={xKey} tick={TICK} axisLine={false} tickLine={false} />
-        <YAxis tick={TICK} axisLine={false} tickLine={false} tickFormatter={v=>`$${(v/1000).toFixed(0)}k`} />
+        <YAxis tick={TICK} axisLine={false} tickLine={false} tickFormatter={fmtAxis} />
         <Tooltip contentStyle={TS} formatter={(v:number)=>[curr(v),yKey]} />
         <Line type="monotone" dataKey={yKey} stroke="#22c55e" strokeWidth={2} dot={{ fill:'#22c55e', r:3 }} />
       </LineChart>
@@ -208,7 +212,7 @@ function AiResultRenderer({ result, data }: { result: AnalysisResult, data: Tran
       <BarChart data={chartData} margin={{ top:4,right:12,left:-16,bottom:0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
         <XAxis dataKey={xKey} tick={TICK} axisLine={false} tickLine={false} />
-        <YAxis tick={TICK} axisLine={false} tickLine={false} tickFormatter={v=>`$${(v/1000).toFixed(0)}k`} />
+        <YAxis tick={TICK} axisLine={false} tickLine={false} tickFormatter={fmtAxis} />
         <Tooltip contentStyle={TS} formatter={(v:number)=>[curr(v)]} />
         <Bar dataKey={yKey} radius={[3,3,0,0]}>
           {chartData.map((_,i) => <Cell key={i} fill={palette[i % palette.length]} />)}
@@ -325,7 +329,7 @@ export default function Analytics() {
             <ResponsiveContainer width="100%" height={230}>
               <BarChart data={byCat.slice(0,7)} layout="vertical" margin={{ top:0,right:12,left:90,bottom:0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" horizontal={false} />
-                <XAxis type="number" tick={TICK} axisLine={false} tickLine={false} tickFormatter={v=>`$${(v/1000).toFixed(0)}k`} />
+                <XAxis type="number" tick={TICK} axisLine={false} tickLine={false} tickFormatter={fmtAxis} />
                 <YAxis type="category" dataKey="name" tick={{ ...TICK, fontSize:11 }} axisLine={false} tickLine={false} width={90} />
                 <Tooltip contentStyle={TS} formatter={(v:number)=>[curr(v)]} />
                 <Bar dataKey="value" radius={[0,4,4,0]}>
@@ -360,7 +364,7 @@ export default function Analytics() {
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
                 <XAxis dataKey="month" tick={TICK} axisLine={false} tickLine={false} />
-                <YAxis tick={TICK} axisLine={false} tickLine={false} tickFormatter={v=>`$${(v/1000).toFixed(0)}k`} />
+                <YAxis tick={TICK} axisLine={false} tickLine={false} tickFormatter={fmtAxis} />
                 <Tooltip contentStyle={TS} formatter={(v:number)=>[curr(v)]} />
                 <Area type="monotone" dataKey="Income"   stroke="#22c55e" strokeWidth={2} fill="url(#gInc)" dot={false} />
                 <Area type="monotone" dataKey="Expenses" stroke="#f43f5e" strokeWidth={2} fill="url(#gExp)" dot={false} />
