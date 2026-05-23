@@ -8,7 +8,6 @@ export default function robots(): MetadataRoute.Robots {
         allow:     '/',
       },
     ],
-    sitemap:  'https://local-ghost-docs.vercel.app/sitemap.xml',
-    host:     'https://local-ghost-docs.vercel.app',
+    sitemap: 'https://local-ghost-docs.vercel.app/sitemap.xml',
   };
 }
